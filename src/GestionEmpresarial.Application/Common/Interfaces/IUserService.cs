@@ -21,5 +21,7 @@ namespace GestionEmpresarial.Application.Common.Interfaces
         Task<Result<string>> GenerateActivationTokenAsync(Guid userId);
         Task<Result<bool>> ActivateAccountAsync(ActivateAccountDto activateAccountDto);
         Task<Result<bool>> ResendActivationEmailAsync(string email);
+        Task<Result<bool>> ActivateAccountWithTokenAsync(string token);
+        Task<Result<bool>> ActivateAccountWithCodeAsync(string email, string code);
     }
 }

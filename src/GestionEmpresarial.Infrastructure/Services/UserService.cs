@@ -259,6 +259,8 @@ namespace GestionEmpresarial.Infrastructure.Services
                     Status = createUserDto.Status,
                     UserType = createUserDto.UserType,
                     IsDeleted = false,
+                    IsActive = false, // El usuario debe estar inactivo hasta que active su cuenta
+                    EmailConfirmed = false, // El correo no está confirmado hasta que active su cuenta
                     CreatedBy = _currentUserService.UserId ?? "System",
                     CreatedAt = _dateTime.Now,
                     UpdatedBy = _currentUserService.UserId ?? "System",
@@ -268,8 +270,11 @@ namespace GestionEmpresarial.Infrastructure.Services
                 await _context.Users.AddAsync(user);
                 await _context.SaveChangesAsync(default);
 
-                // Generar token de activación
-                var activationToken = await GenerateActivationTokenInternalAsync(user.Id);
+                // Generar token de activación y asignarlo al usuario
+                var activationToken = Guid.NewGuid().ToString();
+                user.ActivationToken = activationToken;
+                user.ActivationTokenExpires = _dateTime.Now.AddHours(24);
+                await _context.SaveChangesAsync(default);
 
                 // Asignar roles al usuario
                 if (createUserDto.RoleIds.Any())
@@ -560,7 +565,7 @@ namespace GestionEmpresarial.Infrastructure.Services
                     return Result<string>.Failure("El usuario especificado no existe.");
                 }
 
-                if (user.IsEmailConfirmed)
+                if (user.EmailConfirmed)
                 {
                     return Result<string>.Failure("La cuenta ya está activada.");
                 }
@@ -594,14 +599,13 @@ namespace GestionEmpresarial.Infrastructure.Services
                     return Result<bool>.Failure("El usuario asociado al token no existe.");
                 }
 
-                if (user.IsEmailConfirmed)
+                if (user.EmailConfirmed)
                 {
                     return Result<bool>.Failure("La cuenta ya está activada.");
                 }
 
                 // Activar la cuenta
-                user.IsEmailConfirmed = true;
-                user.EmailConfirmedAt = _dateTime.Now;
+                user.EmailConfirmed = true;
                 user.UpdatedBy = user.Id.ToString();
                 user.UpdatedAt = _dateTime.Now;
 
@@ -644,7 +648,7 @@ namespace GestionEmpresarial.Infrastructure.Services
                     return Result<bool>.Failure("El usuario especificado no existe.");
                 }
 
-                if (user.IsEmailConfirmed)
+                if (user.EmailConfirmed)
                 {
                     return Result<bool>.Failure("La cuenta ya está activada.");
                 }
@@ -734,8 +738,7 @@ namespace GestionEmpresarial.Infrastructure.Services
                     UserType = createLdapUserDto.UserType,
                     IsLdapUser = true, // Marcamos como usuario LDAP
                     IsDeleted = false,
-                    IsEmailConfirmed = true, // Los usuarios LDAP no necesitan confirmar email
-                    EmailConfirmedAt = _dateTime.Now,
+                    EmailConfirmed = true, // Los usuarios LDAP no necesitan confirmar email
                     CreatedBy = _currentUserService.UserId ?? "System",
                     CreatedAt = _dateTime.Now,
                     UpdatedBy = _currentUserService.UserId ?? "System",
@@ -794,6 +797,148 @@ namespace GestionEmpresarial.Infrastructure.Services
             {
                 _logger.LogError(ex, $"Error al crear usuario LDAP: {ex.Message}");
                 return Result<UserDto>.Failure($"Error al crear usuario LDAP: {ex.Message}");
+            }
+        }
+
+        public async Task<Result<bool>> ActivateAccountWithTokenAsync(string token)
+        {
+            try
+            {
+                var user = await _context.Users
+                    .FirstOrDefaultAsync(u => u.ActivationToken == token && !u.IsDeleted);
+
+                if (user == null)
+                {
+                    return Result<bool>.Failure("El token de activación es inválido.");
+                }
+
+                // Verificar si el token ha expirado
+                if (user.ActivationTokenExpires.HasValue && user.ActivationTokenExpires.Value < _dateTime.Now)
+                {
+                    return Result<bool>.Failure("El token de activación ha expirado.");
+                }
+
+                if (user.EmailConfirmed)
+                {
+                    return Result<bool>.Failure("La cuenta ya está activada.");
+                }
+
+                // Activar la cuenta
+                user.EmailConfirmed = true;
+                user.IsActive = true;
+                user.ActivationToken = null;
+                user.ActivationTokenExpires = null;
+                user.UpdatedBy = user.Id.ToString();
+                user.UpdatedAt = _dateTime.Now;
+
+                await _context.SaveChangesAsync(default);
+
+                // Enviar correo de confirmación
+                try
+                {
+                    await _emailService.SendRegistrationConfirmationEmailAsync(user.Email, user.Username);
+                    _logger.LogInformation($"Correo de confirmación enviado a {user.Email}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Error al enviar correo de confirmación a {user.Email}: {ex.Message}");
+                    // No interrumpimos el flujo si falla el envío de correo
+                }
+
+                return Result<bool>.Success(true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error al activar cuenta: {ex.Message}");
+                return Result<bool>.Failure("Error al activar cuenta: " + ex.Message);
+            }
+        }
+
+        public async Task<Result<bool>> ActivateAccountWithCodeAsync(string email, string code)
+        {
+            try
+            {
+                var user = await _context.Users
+                    .FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
+
+                if (user == null)
+                {
+                    return Result<bool>.Failure("El usuario especificado no existe.");
+                }
+
+                if (user.EmailConfirmed)
+                {
+                    return Result<bool>.Failure("La cuenta ya está activada.");
+                }
+
+                if (string.IsNullOrEmpty(user.ActivationToken))
+                {
+                    return Result<bool>.Failure("No hay un token de activación asociado a esta cuenta.");
+                }
+
+                // Verificar si el token ha expirado
+                if (user.ActivationTokenExpires.HasValue && user.ActivationTokenExpires.Value < _dateTime.Now)
+                {
+                    return Result<bool>.Failure("El código de activación ha expirado.");
+                }
+
+                // Generar el código de activación a partir del token
+                string expectedCode = GenerateActivationCode(user.ActivationToken);
+
+                // Verificar que el código coincida
+                if (code != expectedCode)
+                {
+                    return Result<bool>.Failure("El código de activación es inválido.");
+                }
+
+                // Activar la cuenta
+                user.EmailConfirmed = true;
+                user.IsActive = true;
+                user.ActivationToken = null;
+                user.ActivationTokenExpires = null;
+                user.UpdatedBy = user.Id.ToString();
+                user.UpdatedAt = _dateTime.Now;
+
+                await _context.SaveChangesAsync(default);
+
+                // Enviar correo de confirmación
+                try
+                {
+                    await _emailService.SendRegistrationConfirmationEmailAsync(user.Email, user.Username);
+                    _logger.LogInformation($"Correo de confirmación enviado a {user.Email}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Error al enviar correo de confirmación a {user.Email}: {ex.Message}");
+                    // No interrumpimos el flujo si falla el envío de correo
+                }
+
+                return Result<bool>.Success(true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error al activar cuenta: {ex.Message}");
+                return Result<bool>.Failure("Error al activar cuenta: " + ex.Message);
+            }
+        }
+
+        private string GenerateActivationCode(string token)
+        {
+            if (string.IsNullOrEmpty(token))
+                return "000000";
+
+            // Usar el token para generar un hash y convertirlo a un código numérico de 6 dígitos
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+            {
+                var hashBytes = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(token));
+                
+                // Convertir los primeros bytes del hash a un número entero y tomar los últimos 6 dígitos
+                var hashValue = BitConverter.ToInt32(hashBytes, 0);
+                hashValue = Math.Abs(hashValue); // Asegurar que sea positivo
+                
+                // Asegurar que sea de 6 dígitos
+                var code = (hashValue % 900000 + 100000).ToString();
+                return code;
             }
         }
 

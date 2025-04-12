@@ -38,6 +38,7 @@ namespace GestionEmpresarial.Infrastructure
             services.AddScoped<IRouteService, RouteService>();
             services.AddScoped<IMenuService, MenuService>();
             services.AddScoped<IAuditService, AuditService>();
+            services.AddScoped<IEmailTemplateService, EmailTemplateService>();
 
             // Configuración y registro del servicio LDAP
             services.Configure<LdapSettings>(configuration.GetSection("LdapSettings"));

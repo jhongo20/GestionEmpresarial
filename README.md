@@ -25,7 +25,7 @@ El proyecto está organizado en capas siguiendo los principios de Arquitectura L
 - Filtrado y ordenación avanzada
 - Seguridad mejorada con hash de contraseñas BCrypt
 - Envío de correos electrónicos para notificaciones de usuarios
-- Activación de cuentas mediante tokens para verificación de correo electrónico
+- Activación de cuentas mediante tokens y códigos numéricos para verificación de correo electrónico
 - Soporte para usuarios LDAP/Active Directory
 
 ## Requisitos Previos
@@ -99,11 +99,10 @@ La API estará disponible en: http://localhost:5000
 - `GET /api/auth/test`: Endpoint de prueba (no requiere autenticación)
 - `GET /api/auth/protected`: Endpoint protegido (requiere autenticación)
 
-### Activación de Cuenta
+### Activación de Cuentas
 
-- `POST /api/account/activate`: Activar cuenta de usuario con token
-- `POST /api/account/resend-activation`: Reenviar correo de activación
-- `POST /api/account/generate-activation-token/{userId}`: Generar nuevo token de activación (solo administradores)
+- `POST /api/account-activation/activate-with-token`: Activar cuenta mediante token (enviado por correo)
+- `POST /api/account-activation/activate-with-code`: Activar cuenta mediante código numérico y correo electrónico
 
 ### Usuarios
 

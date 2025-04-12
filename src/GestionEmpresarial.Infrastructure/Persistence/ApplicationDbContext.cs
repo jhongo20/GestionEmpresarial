@@ -37,6 +37,7 @@ namespace GestionEmpresarial.Infrastructure.Persistence
         public DbSet<RoleModule> RoleModules => Set<RoleModule>();
         public DbSet<RoleRoute> RoleRoutes => Set<RoleRoute>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+        public DbSet<EmailTemplate> EmailTemplates => Set<EmailTemplate>();
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
