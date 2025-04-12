@@ -1,4 +1,5 @@
 using GestionEmpresarial.Application.Common.Interfaces;
+using GestionEmpresarial.Application.Common.Models;
 using GestionEmpresarial.Infrastructure.Identity;
 using GestionEmpresarial.Infrastructure.Persistence;
 using GestionEmpresarial.Infrastructure.Services;
@@ -31,6 +32,10 @@ namespace GestionEmpresarial.Infrastructure
             services.AddTransient<IPermissionService, PermissionService>();
             services.AddTransient<IUserService, UserService>();
             services.AddTransient<IEmailService, EmailService>();
+
+            // Configuración y registro del servicio LDAP
+            services.Configure<LdapSettings>(configuration.GetSection("LdapSettings"));
+            services.AddTransient<ILdapService, LdapService>();
 
             // Configuración de autenticación JWT
             var jwtSettings = configuration.GetSection("JwtSettings");

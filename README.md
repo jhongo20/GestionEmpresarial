@@ -24,6 +24,7 @@ El proyecto está organizado en capas siguiendo los principios de Arquitectura L
 - Seguridad mejorada con hash de contraseñas BCrypt
 - Envío de correos electrónicos para notificaciones de usuarios
 - Activación de cuentas mediante tokens para verificación de correo electrónico
+- Autenticación híbrida con soporte para LDAP/Active Directory
 
 ## Requisitos Previos
 
@@ -48,7 +49,27 @@ El proyecto está organizado en capas siguiendo los principios de Arquitectura L
    }
    ```
    > **Nota**: Para Gmail, debes usar una contraseña de aplicación generada en la configuración de seguridad de Google.
-4. Ejecutar migraciones de Entity Framework Core:
+
+4. **Configuración de LDAP/Active Directory** (opcional):
+   ```json
+   "LdapSettings": {
+     "Server": "mintrabajo.loc",
+     "Port": 389,
+     "UseSSL": false,
+     "BindDN": "CN=ServiceAccount,OU=ServiceAccounts,DC=mintrabajo,DC=loc",
+     "BindPassword": "ServiceAccountPassword",
+     "SearchBase": "DC=mintrabajo,DC=loc",
+     "SearchFilter": "(&(objectClass=user)(sAMAccountName={0}))",
+     "Enabled": true,
+     "DefaultRole": "Usuario",
+     "EmailAttribute": "mail",
+     "DisplayNameAttribute": "displayName",
+     "UsernameSuffix": "@mintrabajo.loc"
+   }
+   ```
+   > **Nota**: Si no deseas utilizar la autenticación LDAP, establece `Enabled` en `false`.
+
+5. Ejecutar migraciones de Entity Framework Core:
 
 ```bash
 dotnet ef database update
@@ -69,7 +90,7 @@ La API estará disponible en: http://localhost:5000
 
 ### Autenticación
 
-- `POST /api/auth/login`: Iniciar sesión (credenciales de prueba: admin/Admin123!)
+- `POST /api/auth/login`: Iniciar sesión (soporta autenticación local y LDAP)
 - `POST /api/auth/refresh-token`: Renovar token JWT
 - `POST /api/auth/revoke-token`: Revocar token JWT
 - `GET /api/auth/test`: Endpoint de prueba (no requiere autenticación)
@@ -97,3 +118,4 @@ Se incluye un script PowerShell para probar la autenticación:
 - Agregar validación de datos
 - Implementar pruebas unitarias y de integración
 - Mejorar la interfaz de usuario para la activación de cuentas
+- Implementar sincronización periódica de usuarios LDAP

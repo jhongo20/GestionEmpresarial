@@ -29,8 +29,10 @@ namespace GestionEmpresarial.Domain.Entities
         public string? ConcurrencyStamp { get; set; }
         public string? LdapDomain { get; set; }
         public bool IsDeleted { get; set; }
+        public bool IsActive { get; set; }
         public bool IsEmailConfirmed { get; set; } = false;
         public DateTime? EmailConfirmedAt { get; set; }
+        public bool IsLdapUser { get; set; }
 
         // Relaciones
         public virtual ICollection<UserRole> UserRoles { get; set; }
