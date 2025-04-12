@@ -268,6 +268,9 @@ namespace GestionEmpresarial.Infrastructure.Services
                 await _context.Users.AddAsync(user);
                 await _context.SaveChangesAsync(default);
 
+                // Generar token de activación
+                var activationToken = await GenerateActivationTokenInternalAsync(user.Id);
+
                 // Asignar roles al usuario
                 if (createUserDto.RoleIds.Any())
                 {
@@ -287,15 +290,15 @@ namespace GestionEmpresarial.Infrastructure.Services
                     await _context.SaveChangesAsync(default);
                 }
 
-                // Enviar correo de confirmación de registro
+                // Enviar correo de activación
                 try
                 {
-                    await _emailService.SendRegistrationConfirmationEmailAsync(user.Email, user.Username);
-                    _logger.LogInformation($"Correo de confirmación enviado a {user.Email}");
+                    await _emailService.SendActivationEmailAsync(user.Email, user.Username, activationToken);
+                    _logger.LogInformation($"Correo de activación enviado a {user.Email}");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"Error al enviar correo de confirmación a {user.Email}: {ex.Message}");
+                    _logger.LogError(ex, $"Error al enviar correo de activación a {user.Email}: {ex.Message}");
                     // No interrumpimos el flujo si falla el envío de correo
                 }
 
@@ -457,17 +460,15 @@ namespace GestionEmpresarial.Infrastructure.Services
             return Result<UserDto>.Success(userDto);
         }
 
-        public async Task<Result> DeleteUserAsync(Guid id)
+        public async Task<Result<bool>> DeleteUserAsync(Guid id)
         {
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
 
             if (user == null)
             {
-                return Result.Failure("El usuario especificado no existe.");
+                return Result<bool>.Failure("El usuario especificado no existe.");
             }
 
-            // Eliminar lógicamente el usuario
             user.IsDeleted = true;
             user.UpdatedBy = _currentUserService.UserId ?? "System";
             user.UpdatedAt = _dateTime.Now;
@@ -475,29 +476,29 @@ namespace GestionEmpresarial.Infrastructure.Services
             _context.Users.Update(user);
             await _context.SaveChangesAsync(default);
 
-            return Result.Success();
+            return Result<bool>.Success(true);
         }
 
-        public async Task<Result> ChangePasswordAsync(ChangePasswordDto changePasswordDto)
+        public async Task<Result<bool>> ChangePasswordAsync(ChangePasswordDto changePasswordDto)
         {
             var user = await _context.Users
                 .FirstOrDefaultAsync(u => u.Id == changePasswordDto.UserId && !u.IsDeleted);
 
             if (user == null)
             {
-                return Result.Failure("El usuario especificado no existe.");
+                return Result<bool>.Failure("El usuario especificado no existe.");
             }
 
             // Verificar que la contraseña actual sea correcta
             if (!BCrypt.Net.BCrypt.Verify(changePasswordDto.CurrentPassword, user.PasswordHash))
             {
-                return Result.Failure("La contraseña actual es incorrecta.");
+                return Result<bool>.Failure("La contraseña actual es incorrecta.");
             }
 
             // Verificar que la nueva contraseña y la confirmación coincidan
             if (changePasswordDto.NewPassword != changePasswordDto.ConfirmPassword)
             {
-                return Result.Failure("La nueva contraseña y la confirmación no coinciden.");
+                return Result<bool>.Failure("La nueva contraseña y la confirmación no coinciden.");
             }
 
             // Actualizar la contraseña
@@ -508,7 +509,7 @@ namespace GestionEmpresarial.Infrastructure.Services
             _context.Users.Update(user);
             await _context.SaveChangesAsync(default);
 
-            return Result.Success();
+            return Result<bool>.Success(true);
         }
 
         public async Task<Result<List<UserDto>>> GetUsersByRoleAsync(Guid roleId)
@@ -547,6 +548,169 @@ namespace GestionEmpresarial.Infrastructure.Services
                 .ToListAsync();
 
             return Result<List<UserDto>>.Success(users);
+        }
+
+        public async Task<Result<string>> GenerateActivationTokenAsync(Guid userId)
+        {
+            try
+            {
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted);
+                if (user == null)
+                {
+                    return Result<string>.Failure("El usuario especificado no existe.");
+                }
+
+                if (user.IsEmailConfirmed)
+                {
+                    return Result<string>.Failure("La cuenta ya está activada.");
+                }
+
+                var token = await GenerateActivationTokenInternalAsync(userId);
+                return Result<string>.Success(token);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error al generar token de activación: {ex.Message}");
+                return Result<string>.Failure("Error al generar token de activación: " + ex.Message);
+            }
+        }
+
+        public async Task<Result<bool>> ActivateAccountAsync(ActivateAccountDto activateAccountDto)
+        {
+            try
+            {
+                var activationToken = await _context.ActivationTokens
+                    .Include(at => at.User)
+                    .FirstOrDefaultAsync(at => at.Token == activateAccountDto.Token && !at.IsUsed && at.ExpiryDate > _dateTime.Now);
+
+                if (activationToken == null)
+                {
+                    return Result<bool>.Failure("El token de activación es inválido o ha expirado.");
+                }
+
+                var user = activationToken.User;
+                if (user == null || user.IsDeleted)
+                {
+                    return Result<bool>.Failure("El usuario asociado al token no existe.");
+                }
+
+                if (user.IsEmailConfirmed)
+                {
+                    return Result<bool>.Failure("La cuenta ya está activada.");
+                }
+
+                // Activar la cuenta
+                user.IsEmailConfirmed = true;
+                user.EmailConfirmedAt = _dateTime.Now;
+                user.UpdatedBy = user.Id.ToString();
+                user.UpdatedAt = _dateTime.Now;
+
+                // Marcar el token como usado
+                activationToken.IsUsed = true;
+                activationToken.UsedAt = _dateTime.Now;
+                activationToken.UpdatedBy = user.Id.ToString();
+                activationToken.UpdatedAt = _dateTime.Now;
+
+                await _context.SaveChangesAsync(default);
+
+                // Enviar correo de confirmación
+                try
+                {
+                    await _emailService.SendRegistrationConfirmationEmailAsync(user.Email, user.Username);
+                    _logger.LogInformation($"Correo de confirmación enviado a {user.Email}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Error al enviar correo de confirmación a {user.Email}: {ex.Message}");
+                    // No interrumpimos el flujo si falla el envío de correo
+                }
+
+                return Result<bool>.Success(true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error al activar cuenta: {ex.Message}");
+                return Result<bool>.Failure("Error al activar cuenta: " + ex.Message);
+            }
+        }
+
+        public async Task<Result<bool>> ResendActivationEmailAsync(string email)
+        {
+            try
+            {
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
+                if (user == null)
+                {
+                    return Result<bool>.Failure("El usuario especificado no existe.");
+                }
+
+                if (user.IsEmailConfirmed)
+                {
+                    return Result<bool>.Failure("La cuenta ya está activada.");
+                }
+
+                // Invalidar tokens anteriores
+                var previousTokens = await _context.ActivationTokens
+                    .Where(at => at.UserId == user.Id && !at.IsUsed && at.ExpiryDate > _dateTime.Now)
+                    .ToListAsync();
+
+                foreach (var token in previousTokens)
+                {
+                    token.IsUsed = true;
+                    token.UsedAt = _dateTime.Now;
+                    token.UpdatedBy = "System";
+                    token.UpdatedAt = _dateTime.Now;
+                }
+
+                await _context.SaveChangesAsync(default);
+
+                // Generar nuevo token
+                var newToken = await GenerateActivationTokenInternalAsync(user.Id);
+
+                // Enviar correo de activación
+                try
+                {
+                    await _emailService.SendActivationEmailAsync(user.Email, user.Username, newToken);
+                    _logger.LogInformation($"Correo de activación reenviado a {user.Email}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Error al reenviar correo de activación a {user.Email}: {ex.Message}");
+                    return Result<bool>.Failure("Error al enviar correo de activación: " + ex.Message);
+                }
+
+                return Result<bool>.Success(true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error al reenviar correo de activación: {ex.Message}");
+                return Result<bool>.Failure("Error al reenviar correo de activación: " + ex.Message);
+            }
+        }
+
+        private async Task<string> GenerateActivationTokenInternalAsync(Guid userId)
+        {
+            // Generar token aleatorio
+            var token = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
+            
+            // Crear entidad de token de activación
+            var activationToken = new ActivationToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                Token = token,
+                ExpiryDate = _dateTime.Now.AddDays(7), // El token expira en 7 días
+                IsUsed = false,
+                CreatedBy = _currentUserService.UserId ?? "System",
+                CreatedAt = _dateTime.Now,
+                UpdatedBy = _currentUserService.UserId ?? "System",
+                UpdatedAt = _dateTime.Now
+            };
+
+            await _context.ActivationTokens.AddAsync(activationToken);
+            await _context.SaveChangesAsync(default);
+
+            return token;
         }
     }
 }

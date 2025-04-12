@@ -12,6 +12,7 @@ namespace GestionEmpresarial.Domain.Entities
             UserRoles = new List<UserRole>();
             RefreshTokens = new List<RefreshToken>();
             UserSessions = new List<UserSession>();
+            ActivationTokens = new List<ActivationToken>();
         }
 
         public Guid Id { get; set; }
@@ -28,10 +29,13 @@ namespace GestionEmpresarial.Domain.Entities
         public string? ConcurrencyStamp { get; set; }
         public string? LdapDomain { get; set; }
         public bool IsDeleted { get; set; }
+        public bool IsEmailConfirmed { get; set; } = false;
+        public DateTime? EmailConfirmedAt { get; set; }
 
         // Relaciones
         public virtual ICollection<UserRole> UserRoles { get; set; }
         public virtual ICollection<RefreshToken> RefreshTokens { get; set; }
         public virtual ICollection<UserSession> UserSessions { get; set; }
+        public virtual ICollection<ActivationToken> ActivationTokens { get; set; }
     }
 }

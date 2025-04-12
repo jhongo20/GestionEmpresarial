@@ -23,6 +23,7 @@ El proyecto está organizado en capas siguiendo los principios de Arquitectura L
 - Filtrado y ordenación avanzada
 - Seguridad mejorada con hash de contraseñas BCrypt
 - Envío de correos electrónicos para notificaciones de usuarios
+- Activación de cuentas mediante tokens para verificación de correo electrónico
 
 ## Requisitos Previos
 
@@ -74,6 +75,12 @@ La API estará disponible en: http://localhost:5000
 - `GET /api/auth/test`: Endpoint de prueba (no requiere autenticación)
 - `GET /api/auth/protected`: Endpoint protegido (requiere autenticación)
 
+### Activación de Cuenta
+
+- `POST /api/account/activate`: Activar cuenta de usuario con token
+- `POST /api/account/resend-activation`: Reenviar correo de activación
+- `POST /api/account/generate-activation-token/{userId}`: Generar nuevo token de activación (solo administradores)
+
 ## Pruebas
 
 Se incluye un script PowerShell para probar la autenticación:
@@ -89,3 +96,4 @@ Se incluye un script PowerShell para probar la autenticación:
 - Implementar módulo de empleados
 - Agregar validación de datos
 - Implementar pruebas unitarias y de integración
+- Mejorar la interfaz de usuario para la activación de cuentas

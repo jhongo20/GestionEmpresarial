@@ -13,9 +13,12 @@ namespace GestionEmpresarial.Application.Common.Interfaces
         Task<Result<UserDto>> GetUserByIdAsync(Guid id);
         Task<Result<UserDto>> CreateUserAsync(CreateUserDto createUserDto);
         Task<Result<UserDto>> UpdateUserAsync(UpdateUserDto updateUserDto);
-        Task<Result> DeleteUserAsync(Guid id);
-        Task<Result> ChangePasswordAsync(ChangePasswordDto changePasswordDto);
+        Task<Result<bool>> DeleteUserAsync(Guid id);
+        Task<Result<bool>> ChangePasswordAsync(ChangePasswordDto changePasswordDto);
         Task<Result<List<UserDto>>> GetUsersByRoleAsync(Guid roleId);
         Task<Result<PaginatedList<UserDto>>> GetUsersByRolePagedAsync(Guid roleId, PaginationParams paginationParams);
+        Task<Result<string>> GenerateActivationTokenAsync(Guid userId);
+        Task<Result<bool>> ActivateAccountAsync(ActivateAccountDto activateAccountDto);
+        Task<Result<bool>> ResendActivationEmailAsync(string email);
     }
 }

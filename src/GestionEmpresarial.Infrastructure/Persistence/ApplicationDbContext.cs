@@ -31,6 +31,7 @@ namespace GestionEmpresarial.Infrastructure.Persistence
         public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
         public DbSet<UserSession> UserSessions => Set<UserSession>();
+        public DbSet<ActivationToken> ActivationTokens => Set<ActivationToken>();
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
