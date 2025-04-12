@@ -1,0 +1,21 @@
+using GestionEmpresarial.Application.Common.Models;
+using GestionEmpresarial.Application.Users.Dtos;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace GestionEmpresarial.Application.Common.Interfaces
+{
+    public interface IUserService
+    {
+        Task<Result<List<UserDto>>> GetAllUsersAsync();
+        Task<Result<PaginatedList<UserDto>>> GetUsersPagedAsync(PaginationParams paginationParams);
+        Task<Result<UserDto>> GetUserByIdAsync(Guid id);
+        Task<Result<UserDto>> CreateUserAsync(CreateUserDto createUserDto);
+        Task<Result<UserDto>> UpdateUserAsync(UpdateUserDto updateUserDto);
+        Task<Result> DeleteUserAsync(Guid id);
+        Task<Result> ChangePasswordAsync(ChangePasswordDto changePasswordDto);
+        Task<Result<List<UserDto>>> GetUsersByRoleAsync(Guid roleId);
+        Task<Result<PaginatedList<UserDto>>> GetUsersByRolePagedAsync(Guid roleId, PaginationParams paginationParams);
+    }
+}
