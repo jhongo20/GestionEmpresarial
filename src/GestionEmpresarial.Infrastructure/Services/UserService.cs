@@ -688,6 +688,115 @@ namespace GestionEmpresarial.Infrastructure.Services
             }
         }
 
+        public async Task<Result<UserDto>> CreateLdapUserAsync(CreateLdapUserDto createLdapUserDto)
+        {
+            try
+            {
+                // Verificar si el nombre de usuario ya existe
+                if (await _context.Users.AnyAsync(u => u.Username == createLdapUserDto.Username && !u.IsDeleted))
+                {
+                    return Result<UserDto>.Failure("El nombre de usuario ya está en uso.");
+                }
+
+                // Verificar si el correo electrónico ya existe
+                if (await _context.Users.AnyAsync(u => u.Email == createLdapUserDto.Email && !u.IsDeleted))
+                {
+                    return Result<UserDto>.Failure("El correo electrónico ya está en uso.");
+                }
+
+                // Verificar si los roles existen
+                if (createLdapUserDto.RoleIds.Any())
+                {
+                    var existingRoleIds = await _context.Roles
+                        .Where(r => createLdapUserDto.RoleIds.Contains(r.Id) && !r.IsDeleted)
+                        .Select(r => r.Id)
+                        .ToListAsync();
+
+                    var nonExistingRoleIds = createLdapUserDto.RoleIds.Except(existingRoleIds).ToList();
+                    if (nonExistingRoleIds.Any())
+                    {
+                        return Result<UserDto>.Failure($"Los siguientes roles no existen: {string.Join(", ", nonExistingRoleIds)}");
+                    }
+                }
+
+                // Crear el usuario LDAP
+                var user = new User
+                {
+                    Id = Guid.NewGuid(),
+                    Username = createLdapUserDto.Username,
+                    Email = createLdapUserDto.Email,
+                    // Generamos una contraseña aleatoria ya que la autenticación será mediante LDAP
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()),
+                    FirstName = createLdapUserDto.FirstName,
+                    LastName = createLdapUserDto.LastName,
+                    PhoneNumber = createLdapUserDto.PhoneNumber,
+                    Status = createLdapUserDto.Status,
+                    UserType = createLdapUserDto.UserType,
+                    IsLdapUser = true, // Marcamos como usuario LDAP
+                    IsDeleted = false,
+                    IsEmailConfirmed = true, // Los usuarios LDAP no necesitan confirmar email
+                    EmailConfirmedAt = _dateTime.Now,
+                    CreatedBy = _currentUserService.UserId ?? "System",
+                    CreatedAt = _dateTime.Now,
+                    UpdatedBy = _currentUserService.UserId ?? "System",
+                    UpdatedAt = _dateTime.Now
+                };
+
+                await _context.Users.AddAsync(user);
+                await _context.SaveChangesAsync(default);
+
+                // Asignar roles al usuario
+                if (createLdapUserDto.RoleIds.Any())
+                {
+                    var userRoles = createLdapUserDto.RoleIds.Select(roleId => new UserRole
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = user.Id,
+                        RoleId = roleId,
+                        IsDeleted = false,
+                        CreatedBy = _currentUserService.UserId ?? "System",
+                        CreatedAt = _dateTime.Now,
+                        UpdatedBy = _currentUserService.UserId ?? "System",
+                        UpdatedAt = _dateTime.Now
+                    }).ToList();
+
+                    await _context.UserRoles.AddRangeAsync(userRoles);
+                    await _context.SaveChangesAsync(default);
+                }
+
+                // Obtener los nombres de los roles asignados
+                var roleNames = await _context.Roles
+                    .Where(r => createLdapUserDto.RoleIds.Contains(r.Id))
+                    .Select(r => r.Name)
+                    .ToListAsync();
+
+                // Crear el DTO de respuesta
+                var userDto = new UserDto
+                {
+                    Id = user.Id,
+                    Username = user.Username,
+                    Email = user.Email,
+                    FirstName = user.FirstName,
+                    LastName = user.LastName,
+                    PhoneNumber = user.PhoneNumber,
+                    Status = user.Status,
+                    UserType = user.UserType,
+                    Roles = roleNames,
+                    CreatedAt = user.CreatedAt,
+                    CreatedBy = user.CreatedBy,
+                    UpdatedAt = user.UpdatedAt,
+                    UpdatedBy = user.UpdatedBy
+                };
+
+                return Result<UserDto>.Success(userDto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error al crear usuario LDAP: {ex.Message}");
+                return Result<UserDto>.Failure($"Error al crear usuario LDAP: {ex.Message}");
+            }
+        }
+
         private async Task<string> GenerateActivationTokenInternalAsync(Guid userId)
         {
             // Generar token aleatorio

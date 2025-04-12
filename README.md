@@ -24,7 +24,7 @@ El proyecto está organizado en capas siguiendo los principios de Arquitectura L
 - Seguridad mejorada con hash de contraseñas BCrypt
 - Envío de correos electrónicos para notificaciones de usuarios
 - Activación de cuentas mediante tokens para verificación de correo electrónico
-- Autenticación híbrida con soporte para LDAP/Active Directory
+- Soporte para usuarios LDAP/Active Directory
 
 ## Requisitos Previos
 
@@ -67,7 +67,7 @@ El proyecto está organizado en capas siguiendo los principios de Arquitectura L
      "UsernameSuffix": "@mintrabajo.loc"
    }
    ```
-   > **Nota**: Si no deseas utilizar la autenticación LDAP, establece `Enabled` en `false`.
+   > **Nota**: Esta configuración permite la autenticación de usuarios LDAP creados manualmente en el sistema. Para crear un usuario LDAP, utilice el endpoint `POST /api/users/ldap`.
 
 5. Ejecutar migraciones de Entity Framework Core:
 
@@ -102,6 +102,19 @@ La API estará disponible en: http://localhost:5000
 - `POST /api/account/resend-activation`: Reenviar correo de activación
 - `POST /api/account/generate-activation-token/{userId}`: Generar nuevo token de activación (solo administradores)
 
+### Usuarios
+
+- `GET /api/users`: Obtener todos los usuarios
+- `GET /api/users/paged`: Obtener usuarios paginados
+- `GET /api/users/{id}`: Obtener usuario por ID
+- `POST /api/users`: Crear usuario
+- `POST /api/users/ldap`: Crear usuario LDAP
+- `PUT /api/users/{id}`: Actualizar usuario
+- `DELETE /api/users/{id}`: Eliminar usuario
+- `POST /api/users/change-password`: Cambiar contraseña
+- `GET /api/users/by-role/{roleId}`: Obtener usuarios por rol
+- `GET /api/users/by-role/{roleId}/paged`: Obtener usuarios por rol paginados
+
 ## Pruebas
 
 Se incluye un script PowerShell para probar la autenticación:
@@ -118,4 +131,4 @@ Se incluye un script PowerShell para probar la autenticación:
 - Agregar validación de datos
 - Implementar pruebas unitarias y de integración
 - Mejorar la interfaz de usuario para la activación de cuentas
-- Implementar sincronización periódica de usuarios LDAP
+- Implementar sincronización automática de atributos de usuarios LDAP

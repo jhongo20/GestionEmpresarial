@@ -2,6 +2,7 @@ using GestionEmpresarial.Application.Common.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace GestionEmpresarial.API.Controllers
 {
@@ -10,12 +11,10 @@ namespace GestionEmpresarial.API.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IIdentityService _identityService;
-        private readonly ICurrentUserService _currentUserService;
 
-        public AuthController(IIdentityService identityService, ICurrentUserService currentUserService)
+        public AuthController(IIdentityService identityService)
         {
             _identityService = identityService;
-            _currentUserService = currentUserService;
         }
 
         [HttpPost("login")]
@@ -24,47 +23,14 @@ namespace GestionEmpresarial.API.Controllers
         {
             var result = await _identityService.AuthenticateAsync(
                 request.Username,
-                request.Password,
-                _currentUserService.IpAddress ?? "unknown");
+                request.Password);
 
-            if (!result.Succeeded)
+            if (result == null)
             {
-                return Unauthorized(new { Errors = result.Errors });
+                return Unauthorized(new { Error = "Usuario o contraseña incorrectos" });
             }
 
-            return Ok(result.Data);
-        }
-
-        [HttpPost("refresh-token")]
-        [AllowAnonymous]
-        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
-        {
-            var result = await _identityService.RefreshTokenAsync(
-                request.RefreshToken,
-                _currentUserService.IpAddress ?? "unknown");
-
-            if (!result.Succeeded)
-            {
-                return Unauthorized(new { Errors = result.Errors });
-            }
-
-            return Ok(result.Data);
-        }
-
-        [HttpPost("revoke-token")]
-        [Authorize]
-        public async Task<IActionResult> RevokeToken([FromBody] RevokeTokenRequest request)
-        {
-            var result = await _identityService.RevokeTokenAsync(
-                request.Token,
-                _currentUserService.IpAddress ?? "unknown");
-
-            if (!result.Succeeded)
-            {
-                return BadRequest(new { Errors = result.Errors });
-            }
-
-            return Ok(new { Message = "Token revocado correctamente" });
+            return Ok(result);
         }
 
         [HttpGet("test")]
@@ -90,15 +56,5 @@ namespace GestionEmpresarial.API.Controllers
     {
         public string Username { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
-    }
-
-    public class RefreshTokenRequest
-    {
-        public string RefreshToken { get; set; } = string.Empty;
-    }
-
-    public class RevokeTokenRequest
-    {
-        public string Token { get; set; } = string.Empty;
     }
 }

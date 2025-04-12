@@ -107,6 +107,18 @@ namespace GestionEmpresarial.API.Controllers
             return BadRequest(result.Errors.FirstOrDefault());
         }
 
+        [HttpPost("ldap")]
+        [Authorize]
+        public async Task<IActionResult> CreateLdapUser([FromBody] CreateLdapUserDto createLdapUserDto)
+        {
+            var result = await _userService.CreateLdapUserAsync(createLdapUserDto);
+
+            if (result.Succeeded)
+                return CreatedAtAction(nameof(GetUserById), new { id = result.Data.Id }, result.Data);
+
+            return BadRequest(result.Errors.FirstOrDefault());
+        }
+
         [HttpGet("by-role/{roleId}")]
         [Authorize]
         public async Task<IActionResult> GetUsersByRole(Guid roleId)
