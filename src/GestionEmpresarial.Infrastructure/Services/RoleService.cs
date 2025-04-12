@@ -197,14 +197,14 @@ namespace GestionEmpresarial.Infrastructure.Services
             return Result<RoleDto>.Success(roleDto);
         }
 
-        public async Task<Result> DeleteRoleAsync(Guid id)
+        public async Task<Result<bool>> DeleteRoleAsync(Guid id)
         {
             var role = await _context.Roles
                 .FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted);
 
             if (role == null)
             {
-                return Result.Failure("El rol especificado no existe.");
+                return Result<bool>.Failure("El rol especificado no existe.");
             }
 
             // Verificar si hay usuarios asignados a este rol
@@ -213,7 +213,7 @@ namespace GestionEmpresarial.Infrastructure.Services
 
             if (hasUsers)
             {
-                return Result.Failure("No se puede eliminar el rol porque tiene usuarios asignados.");
+                return Result<bool>.Failure("No se puede eliminar el rol porque tiene usuarios asignados.");
             }
 
             // Eliminar lógicamente el rol
@@ -224,7 +224,211 @@ namespace GestionEmpresarial.Infrastructure.Services
             _context.Roles.Update(role);
             await _context.SaveChangesAsync(default);
 
-            return Result.Success();
+            return Result<bool>.Success(true);
+        }
+
+        public async Task<Result<bool>> AssignModuleToRoleAsync(AssignModuleToRoleDto assignModuleToRoleDto)
+        {
+            try
+            {
+                // Verificar si el rol existe
+                var role = await _context.Roles
+                    .FirstOrDefaultAsync(r => r.Id == assignModuleToRoleDto.RoleId && !r.IsDeleted);
+
+                if (role == null)
+                {
+                    return Result<bool>.Failure("El rol especificado no existe.");
+                }
+
+                // Verificar si el módulo existe
+                var module = await _context.Modules
+                    .FirstOrDefaultAsync(m => m.Id == assignModuleToRoleDto.ModuleId && !m.IsDeleted);
+
+                if (module == null)
+                {
+                    return Result<bool>.Failure("El módulo especificado no existe.");
+                }
+
+                // Verificar si ya existe la asignación
+                var existingAssignment = await _context.RoleModules
+                    .FirstOrDefaultAsync(rm => rm.RoleId == assignModuleToRoleDto.RoleId && 
+                                              rm.ModuleId == assignModuleToRoleDto.ModuleId && 
+                                              !rm.IsDeleted);
+
+                if (existingAssignment != null)
+                {
+                    // Si ya existe pero está inactivo, lo activamos
+                    if (!existingAssignment.IsActive)
+                    {
+                        existingAssignment.IsActive = true;
+                        existingAssignment.UpdatedBy = _currentUserService.UserId ?? "System";
+                        existingAssignment.UpdatedAt = _dateTime.Now;
+
+                        _context.RoleModules.Update(existingAssignment);
+                        await _context.SaveChangesAsync(default);
+
+                        return Result<bool>.Success(true);
+                    }
+
+                    return Result<bool>.Failure("El módulo ya está asignado a este rol.");
+                }
+
+                // Crear la asignación
+                var roleModule = new RoleModule
+                {
+                    Id = Guid.NewGuid(),
+                    RoleId = assignModuleToRoleDto.RoleId,
+                    ModuleId = assignModuleToRoleDto.ModuleId,
+                    IsActive = true,
+                    IsDeleted = false,
+                    CreatedBy = _currentUserService.UserId ?? "System",
+                    CreatedAt = _dateTime.Now,
+                    UpdatedBy = _currentUserService.UserId ?? "System",
+                    UpdatedAt = _dateTime.Now
+                };
+
+                await _context.RoleModules.AddAsync(roleModule);
+                await _context.SaveChangesAsync(default);
+
+                return Result<bool>.Success(true);
+            }
+            catch (Exception ex)
+            {
+                return Result<bool>.Failure($"Error al asignar el módulo al rol: {ex.Message}");
+            }
+        }
+
+        public async Task<Result<bool>> RemoveModuleFromRoleAsync(Guid roleId, Guid moduleId)
+        {
+            try
+            {
+                // Verificar si existe la asignación
+                var roleModule = await _context.RoleModules
+                    .FirstOrDefaultAsync(rm => rm.RoleId == roleId && 
+                                              rm.ModuleId == moduleId && 
+                                              !rm.IsDeleted);
+
+                if (roleModule == null)
+                {
+                    return Result<bool>.Failure("El módulo no está asignado a este rol.");
+                }
+
+                // Marcar como eliminado
+                roleModule.IsDeleted = true;
+                roleModule.UpdatedBy = _currentUserService.UserId ?? "System";
+                roleModule.UpdatedAt = _dateTime.Now;
+
+                _context.RoleModules.Update(roleModule);
+                await _context.SaveChangesAsync(default);
+
+                return Result<bool>.Success(true);
+            }
+            catch (Exception ex)
+            {
+                return Result<bool>.Failure($"Error al eliminar el módulo del rol: {ex.Message}");
+            }
+        }
+
+        public async Task<Result<bool>> AssignRouteToRoleAsync(AssignRouteToRoleDto assignRouteToRoleDto)
+        {
+            try
+            {
+                // Verificar si el rol existe
+                var role = await _context.Roles
+                    .FirstOrDefaultAsync(r => r.Id == assignRouteToRoleDto.RoleId && !r.IsDeleted);
+
+                if (role == null)
+                {
+                    return Result<bool>.Failure("El rol especificado no existe.");
+                }
+
+                // Verificar si la ruta existe
+                var route = await _context.Routes
+                    .FirstOrDefaultAsync(r => r.Id == assignRouteToRoleDto.RouteId && !r.IsDeleted);
+
+                if (route == null)
+                {
+                    return Result<bool>.Failure("La ruta especificada no existe.");
+                }
+
+                // Verificar si ya existe la asignación
+                var existingAssignment = await _context.RoleRoutes
+                    .FirstOrDefaultAsync(rr => rr.RoleId == assignRouteToRoleDto.RoleId && 
+                                              rr.RouteId == assignRouteToRoleDto.RouteId && 
+                                              !rr.IsDeleted);
+
+                if (existingAssignment != null)
+                {
+                    // Si ya existe pero está inactivo, lo activamos
+                    if (!existingAssignment.IsActive)
+                    {
+                        existingAssignment.IsActive = true;
+                        existingAssignment.UpdatedBy = _currentUserService.UserId ?? "System";
+                        existingAssignment.UpdatedAt = _dateTime.Now;
+
+                        _context.RoleRoutes.Update(existingAssignment);
+                        await _context.SaveChangesAsync(default);
+
+                        return Result<bool>.Success(true);
+                    }
+
+                    return Result<bool>.Failure("La ruta ya está asignada a este rol.");
+                }
+
+                // Crear la asignación
+                var roleRoute = new RoleRoute
+                {
+                    Id = Guid.NewGuid(),
+                    RoleId = assignRouteToRoleDto.RoleId,
+                    RouteId = assignRouteToRoleDto.RouteId,
+                    IsActive = true,
+                    IsDeleted = false,
+                    CreatedBy = _currentUserService.UserId ?? "System",
+                    CreatedAt = _dateTime.Now,
+                    UpdatedBy = _currentUserService.UserId ?? "System",
+                    UpdatedAt = _dateTime.Now
+                };
+
+                await _context.RoleRoutes.AddAsync(roleRoute);
+                await _context.SaveChangesAsync(default);
+
+                return Result<bool>.Success(true);
+            }
+            catch (Exception ex)
+            {
+                return Result<bool>.Failure($"Error al asignar la ruta al rol: {ex.Message}");
+            }
+        }
+
+        public async Task<Result<bool>> RemoveRouteFromRoleAsync(Guid roleId, Guid routeId)
+        {
+            try
+            {
+                // Verificar si existe la asignación
+                var roleRoute = await _context.RoleRoutes
+                    .FirstOrDefaultAsync(rr => rr.RoleId == roleId && 
+                                              rr.RouteId == routeId && 
+                                              !rr.IsDeleted);
+
+                if (roleRoute == null)
+                {
+                    return Result<bool>.Failure("La ruta no está asignada a este rol.");
+                }
+
+                // Marcar como eliminado
+                roleRoute.IsDeleted = true;
+                roleRoute.UpdatedBy = _currentUserService.UserId ?? "System";
+                roleRoute.UpdatedAt = _dateTime.Now;
+
+                _context.RoleRoutes.Update(roleRoute);
+                await _context.SaveChangesAsync(default);
+
+                return Result<bool>.Success(true);
+            }
+            catch (Exception ex)
+            {
+                return Result<bool>.Failure($"Error al eliminar la ruta del rol: {ex.Message}");
+            }
         }
     }
 }

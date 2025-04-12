@@ -15,6 +15,7 @@ El proyecto está organizado en capas siguiendo los principios de Arquitectura L
 
 - Autenticación JWT
 - Gestión de usuarios y roles
+- Sistema de menús basados en roles
 - Arquitectura Limpia
 - Patrón Mediator con MediatR
 - Entity Framework Core para acceso a datos
@@ -91,6 +92,7 @@ La API estará disponible en: http://localhost:5000
 ### Autenticación
 
 - `POST /api/auth/login`: Iniciar sesión (soporta autenticación local y LDAP)
+- `POST /api/auth/test-login`: Iniciar sesión de prueba (para usuarios de prueba)
 - `POST /api/auth/refresh-token`: Renovar token JWT
 - `POST /api/auth/revoke-token`: Revocar token JWT
 - `GET /api/auth/test`: Endpoint de prueba (no requiere autenticación)
@@ -115,6 +117,21 @@ La API estará disponible en: http://localhost:5000
 - `GET /api/users/by-role/{roleId}`: Obtener usuarios por rol
 - `GET /api/users/by-role/{roleId}/paged`: Obtener usuarios por rol paginados
 
+### Menús y Navegación
+
+- `GET /api/menus/my-menu`: Obtener el menú del usuario autenticado
+- `GET /api/menus/by-role/{roleId}`: Obtener el menú para un rol específico
+- `GET /api/modules`: Obtener todos los módulos
+- `GET /api/modules/{id}`: Obtener un módulo por ID
+- `POST /api/modules`: Crear un nuevo módulo
+- `PUT /api/modules/{id}`: Actualizar un módulo existente
+- `DELETE /api/modules/{id}`: Eliminar un módulo
+- `GET /api/routes`: Obtener todas las rutas
+- `GET /api/routes/{id}`: Obtener una ruta por ID
+- `POST /api/routes`: Crear una nueva ruta
+- `PUT /api/routes/{id}`: Actualizar una ruta existente
+- `DELETE /api/routes/{id}`: Eliminar una ruta
+
 ## Pruebas
 
 Se incluye un script PowerShell para probar la autenticación:
@@ -123,12 +140,91 @@ Se incluye un script PowerShell para probar la autenticación:
 ./test-auth.ps1
 ```
 
-## Próximos Pasos
+## Usuarios de Prueba
 
-- Implementar módulo de empresas
-- Implementar módulo de sucursales
-- Implementar módulo de empleados
-- Agregar validación de datos
-- Implementar pruebas unitarias y de integración
-- Mejorar la interfaz de usuario para la activación de cuentas
-- Implementar sincronización automática de atributos de usuarios LDAP
+El sistema incluye los siguientes usuarios de prueba para facilitar las pruebas:
+
+| Usuario    | Contraseña | Rol           | Acceso                                      |
+|------------|------------|---------------|---------------------------------------------|
+| admin      | Admin123!  | Administrador | Acceso completo a todos los módulos y rutas |
+| supervisor | Admin123!  | Supervisor    | Acceso a Dashboard, Usuarios y Roles        |
+| user       | Admin123!  | Usuario       | Acceso limitado solo al Dashboard           |
+| testadmin  | test123    | Administrador | Acceso completo (usuario alternativo)       |
+
+## Sistema de Menús Basados en Roles
+
+El sistema implementa un mecanismo de menús dinámicos basados en roles que permite:
+
+1. **Configuración de módulos**: Cada módulo representa una sección principal de la aplicación.
+2. **Configuración de rutas**: Las rutas son elementos de navegación dentro de un módulo.
+3. **Asignación de permisos por rol**: Cada rol puede tener acceso a diferentes módulos y rutas.
+4. **Menús dinámicos**: El frontend puede solicitar el menú correspondiente al usuario autenticado.
+
+### Estructura de Datos
+
+- **Módulos**: Representan las secciones principales de la aplicación.
+  - Propiedades: Id, Name, Description, Icon, Path, Order, IsActive
+  
+- **Rutas**: Representan las páginas o funcionalidades dentro de un módulo.
+  - Propiedades: Id, Name, Path, Icon, Order, IsActive, ModuleId
+  
+- **RoleModules**: Asigna módulos a roles específicos.
+  - Propiedades: Id, RoleId, ModuleId, IsActive
+  
+- **RoleRoutes**: Asigna rutas a roles específicos.
+  - Propiedades: Id, RoleId, RouteId, IsActive
+
+### Ejemplo de Respuesta de Menú
+
+```json
+[
+  {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "name": "Dashboard",
+    "icon": "dashboard",
+    "path": "/dashboard",
+    "order": 1,
+    "children": [
+      {
+        "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "name": "Inicio",
+        "path": "/dashboard",
+        "icon": "home",
+        "order": 1
+      },
+      {
+        "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "name": "Estadísticas",
+        "path": "/dashboard/stats",
+        "icon": "bar_chart",
+        "order": 2
+      }
+    ]
+  }
+]
+```
+
+## Migración Manual de Base de Datos
+
+Para aplicar las migraciones manuales y configurar los módulos, rutas y usuarios de prueba:
+
+1. Ejecute los siguientes scripts SQL en orden:
+
+```bash
+# Desde la carpeta raíz del proyecto
+sqlcmd -S localhost -d GestionEmpresarialNuevoDB -i "src\GestionEmpresarial.Infrastructure\Persistence\Migrations\Manual\FixedModulesAndRoutes.sql" -E
+sqlcmd -S localhost -d GestionEmpresarialNuevoDB -i "src\GestionEmpresarial.Infrastructure\Persistence\Migrations\Manual\AddRoleAssignments.sql" -E
+sqlcmd -S localhost -d GestionEmpresarialNuevoDB -i "src\GestionEmpresarial.Infrastructure\Persistence\Migrations\Manual\AddTestUsers.sql" -E
+```
+
+## Contribución
+
+1. Haz un fork del repositorio
+2. Crea una rama para tu característica (`git checkout -b feature/amazing-feature`)
+3. Haz commit de tus cambios (`git commit -m 'Add some amazing feature'`)
+4. Haz push a la rama (`git push origin feature/amazing-feature`)
+5. Abre un Pull Request
+
+## Licencia
+
+Este proyecto está licenciado bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para más detalles.

@@ -33,6 +33,36 @@ namespace GestionEmpresarial.API.Controllers
             return Ok(result);
         }
 
+        [HttpPost("test-login")]
+        [AllowAnonymous]
+        public async Task<IActionResult> TestLogin([FromBody] LoginRequest request)
+        {
+            // Verificar credenciales de prueba
+            if (request.Username == "testadmin" && request.Password == "test123")
+            {
+                // Buscar el usuario en la base de datos
+                var user = await _identityService.GetUserByUsernameAsync(request.Username);
+                
+                if (user != null)
+                {
+                    // Generar token JWT manualmente
+                    var token = _identityService.GenerateTokenForUser(user);
+                    
+                    return Ok(new { 
+                        Id = user.Id,
+                        Username = user.Username,
+                        Email = user.Email,
+                        FirstName = user.FirstName,
+                        LastName = user.LastName,
+                        Token = token,
+                        Roles = user.Roles
+                    });
+                }
+            }
+            
+            return Unauthorized(new { Error = "Usuario o contraseña incorrectos" });
+        }
+
         [HttpGet("test")]
         [AllowAnonymous]
         public IActionResult Test()

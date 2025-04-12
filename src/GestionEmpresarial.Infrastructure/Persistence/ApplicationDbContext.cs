@@ -26,12 +26,16 @@ namespace GestionEmpresarial.Infrastructure.Persistence
 
         public DbSet<User> Users => Set<User>();
         public DbSet<Role> Roles => Set<Role>();
-        public DbSet<Permission> Permissions => Set<Permission>();
         public DbSet<UserRole> UserRoles => Set<UserRole>();
+        public DbSet<Permission> Permissions => Set<Permission>();
         public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
         public DbSet<UserSession> UserSessions => Set<UserSession>();
         public DbSet<ActivationToken> ActivationTokens => Set<ActivationToken>();
+        public DbSet<GestionEmpresarial.Domain.Entities.Module> Modules => Set<GestionEmpresarial.Domain.Entities.Module>();
+        public DbSet<Route> Routes => Set<Route>();
+        public DbSet<RoleModule> RoleModules => Set<RoleModule>();
+        public DbSet<RoleRoute> RoleRoutes => Set<RoleRoute>();
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {

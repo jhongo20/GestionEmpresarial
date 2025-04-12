@@ -13,6 +13,12 @@ namespace GestionEmpresarial.Application.Common.Interfaces
         Task<Result<RoleDto>> GetRoleByIdAsync(Guid id);
         Task<Result<RoleDto>> CreateRoleAsync(CreateRoleDto createRoleDto);
         Task<Result<RoleDto>> UpdateRoleAsync(UpdateRoleDto updateRoleDto);
-        Task<Result> DeleteRoleAsync(Guid id);
+        Task<Result<bool>> DeleteRoleAsync(Guid id);
+        
+        // Nuevos métodos para gestionar módulos y rutas
+        Task<Result<bool>> AssignModuleToRoleAsync(AssignModuleToRoleDto assignModuleToRoleDto);
+        Task<Result<bool>> RemoveModuleFromRoleAsync(Guid roleId, Guid moduleId);
+        Task<Result<bool>> AssignRouteToRoleAsync(AssignRouteToRoleDto assignRouteToRoleDto);
+        Task<Result<bool>> RemoveRouteFromRoleAsync(Guid roleId, Guid routeId);
     }
 }

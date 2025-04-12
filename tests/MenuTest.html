@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba de Menús Basados en Roles</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 20px;
+        }
+        .menu-container {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+        }
+        .menu-item {
+            padding: 8px 15px;
+            margin-bottom: 5px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .menu-item:hover {
+            background-color: #e9ecef;
+        }
+        .submenu {
+            margin-left: 20px;
+        }
+        .submenu-item {
+            padding: 6px 15px;
+            margin-bottom: 3px;
+            background-color: #f1f3f5;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .submenu-item:hover {
+            background-color: #dee2e6;
+        }
+        .icon {
+            margin-right: 10px;
+        }
+        .user-info {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+        }
+        #loginForm {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .response-container {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        pre {
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4 text-center">Prueba de Menús Basados en Roles</h1>
+        
+        <div id="loginSection">
+            <h2 class="mb-3">Iniciar Sesión</h2>
+            <form id="loginForm">
+                <div class="mb-3">
+                    <label for="username" class="form-label">Usuario</label>
+                    <select id="username" class="form-select">
+                        <option value="admin">admin (Administrador)</option>
+                        <option value="supervisor">supervisor (Supervisor)</option>
+                        <option value="user">user (Usuario)</option>
+                        <option value="testadmin">testadmin (Administrador - Prueba)</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">Contraseña</label>
+                    <input type="password" class="form-control" id="password" value="Admin123!">
+                    <div class="form-text">Para el usuario testadmin, use la contraseña: test123</div>
+                </div>
+                <button type="submit" class="btn btn-primary">Iniciar Sesión</button>
+            </form>
+            <div id="loginResponse" class="response-container d-none">
+                <h4>Respuesta:</h4>
+                <pre id="loginResponseText"></pre>
+            </div>
+        </div>
+        
+        <div id="menuSection" class="d-none">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-3">Menú del Usuario</h2>
+                <button id="logoutBtn" class="btn btn-outline-danger">Cerrar Sesión</button>
+            </div>
+            
+            <div id="userInfo" class="user-info">
+                <h4>Información del Usuario</h4>
+                <p><strong>Usuario:</strong> <span id="userUsername"></span></p>
+                <p><strong>Rol:</strong> <span id="userRole"></span></p>
+            </div>
+            
+            <div class="mb-3">
+                <button id="getMenuBtn" class="btn btn-success">Obtener Menú</button>
+                <button id="getTestMenuBtn" class="btn btn-info ms-2">Obtener Menú de Prueba</button>
+            </div>
+            
+            <div id="menuResponse" class="response-container d-none">
+                <h4>Respuesta JSON:</h4>
+                <pre id="menuResponseText"></pre>
+            </div>
+            
+            <div id="menuContainer" class="menu-container d-none">
+                <h4>Visualización del Menú</h4>
+                <div id="menuItems"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Configuración de la API
+        const apiUrl = 'http://localhost:5108';
+        let token = '';
+        let currentUser = null;
+        
+        // Elementos del DOM
+        const loginForm = document.getElementById('loginForm');
+        const loginResponse = document.getElementById('loginResponse');
+        const loginResponseText = document.getElementById('loginResponseText');
+        const menuSection = document.getElementById('menuSection');
+        const loginSection = document.getElementById('loginSection');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const getMenuBtn = document.getElementById('getMenuBtn');
+        const getTestMenuBtn = document.getElementById('getTestMenuBtn');
+        const menuResponse = document.getElementById('menuResponse');
+        const menuResponseText = document.getElementById('menuResponseText');
+        const menuContainer = document.getElementById('menuContainer');
+        const menuItems = document.getElementById('menuItems');
+        const userUsername = document.getElementById('userUsername');
+        const userRole = document.getElementById('userRole');
+        
+        // Función para iniciar sesión
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await fetch(`${apiUrl}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                loginResponse.classList.remove('d-none');
+                loginResponseText.textContent = JSON.stringify(data, null, 2);
+                
+                if (response.ok && data.token) {
+                    token = data.token;
+                    currentUser = {
+                        username: username,
+                        role: username === 'admin' || username === 'testadmin' ? 'Administrador' : 
+                              username === 'supervisor' ? 'Supervisor' : 'Usuario'
+                    };
+                    
+                    // Mostrar sección de menú
+                    loginSection.classList.add('d-none');
+                    menuSection.classList.remove('d-none');
+                    
+                    // Actualizar información del usuario
+                    userUsername.textContent = currentUser.username;
+                    userRole.textContent = currentUser.role;
+                    
+                    // Obtener menú automáticamente
+                    getMenu();
+                }
+            } catch (error) {
+                loginResponseText.textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Función para cerrar sesión
+        logoutBtn.addEventListener('click', () => {
+            token = '';
+            currentUser = null;
+            
+            // Ocultar sección de menú y mostrar login
+            menuSection.classList.add('d-none');
+            loginSection.classList.remove('d-none');
+            
+            // Limpiar respuestas
+            loginResponse.classList.add('d-none');
+            menuResponse.classList.add('d-none');
+            menuContainer.classList.add('d-none');
+        });
+        
+        // Función para obtener el menú
+        getMenuBtn.addEventListener('click', getMenu);
+        getTestMenuBtn.addEventListener('click', getTestMenu);
+        
+        async function getMenu() {
+            try {
+                const response = await fetch(`${apiUrl}/api/menus/my-menu`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                const data = await response.json();
+                menuResponse.classList.remove('d-none');
+                menuResponseText.textContent = JSON.stringify(data, null, 2);
+                
+                if (response.ok) {
+                    renderMenu(data);
+                }
+            } catch (error) {
+                menuResponseText.textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        // Función para obtener el menú de prueba (sin autenticación)
+        async function getTestMenu() {
+            try {
+                const response = await fetch(`${apiUrl}/api/menus/test-menu`, {
+                    method: 'GET'
+                });
+                
+                const data = await response.json();
+                menuResponse.classList.remove('d-none');
+                menuResponseText.textContent = JSON.stringify(data, null, 2);
+                
+                if (response.ok) {
+                    renderMenu(data);
+                }
+            } catch (error) {
+                menuResponseText.textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        // Función para renderizar el menú
+        function renderMenu(menuData) {
+            menuContainer.classList.remove('d-none');
+            menuItems.innerHTML = '';
+            
+            if (!menuData || menuData.length === 0) {
+                menuItems.innerHTML = '<div class="alert alert-info">No hay elementos de menú disponibles para este usuario.</div>';
+                return;
+            }
+            
+            menuData.forEach(module => {
+                const moduleItem = document.createElement('div');
+                moduleItem.className = 'menu-item';
+                moduleItem.innerHTML = `<i class="icon bi bi-${module.icon || 'box'}"></i> ${module.name}`;
+                
+                if (module.children && module.children.length > 0) {
+                    const submenu = document.createElement('div');
+                    submenu.className = 'submenu';
+                    
+                    module.children.forEach(route => {
+                        const routeItem = document.createElement('div');
+                        routeItem.className = 'submenu-item';
+                        routeItem.innerHTML = `<i class="icon bi bi-${route.icon || 'arrow-right'}"></i> ${route.name}`;
+                        submenu.appendChild(routeItem);
+                    });
+                    
+                    menuItems.appendChild(moduleItem);
+                    menuItems.appendChild(submenu);
+                } else {
+                    menuItems.appendChild(moduleItem);
+                }
+            });
+        }
+    </script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+</body>
+</html>

@@ -15,6 +15,10 @@ namespace GestionEmpresarial.Application.Common.Interfaces
         DbSet<RefreshToken> RefreshTokens { get; }
         DbSet<UserSession> UserSessions { get; }
         DbSet<ActivationToken> ActivationTokens { get; }
+        DbSet<GestionEmpresarial.Domain.Entities.Module> Modules { get; }
+        DbSet<Route> Routes { get; }
+        DbSet<RoleModule> RoleModules { get; }
+        DbSet<RoleRoute> RoleRoutes { get; }
 
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
     }

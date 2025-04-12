@@ -4,25 +4,25 @@ using GestionEmpresarial.Domain.Common;
 
 namespace GestionEmpresarial.Domain.Entities
 {
-    public class Role : AuditableEntity
+    public class Module : AuditableEntity
     {
-        public Role()
+        public Module()
         {
-            UserRoles = new List<UserRole>();
-            RolePermissions = new List<RolePermission>();
+            Routes = new List<Route>();
             RoleModules = new List<RoleModule>();
-            RoleRoutes = new List<RoleRoute>();
         }
 
         public Guid Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
+        public string Icon { get; set; } = string.Empty;
+        public string Path { get; set; } = string.Empty;
+        public int Order { get; set; }
+        public bool IsActive { get; set; } = true;
         public bool IsDeleted { get; set; }
 
         // Relaciones
-        public virtual ICollection<UserRole> UserRoles { get; set; }
-        public virtual ICollection<RolePermission> RolePermissions { get; set; }
+        public virtual ICollection<Route> Routes { get; set; }
         public virtual ICollection<RoleModule> RoleModules { get; set; }
-        public virtual ICollection<RoleRoute> RoleRoutes { get; set; }
     }
 }

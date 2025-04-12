@@ -94,5 +94,53 @@ namespace GestionEmpresarial.API.Controllers
 
             return BadRequest(result.Errors.FirstOrDefault());
         }
+
+        [HttpPost("assign-module")]
+        [Authorize]
+        public async Task<IActionResult> AssignModuleToRole([FromBody] AssignModuleToRoleDto assignModuleToRoleDto)
+        {
+            var result = await _roleService.AssignModuleToRoleAsync(assignModuleToRoleDto);
+
+            if (result.Succeeded)
+                return Ok(new { Message = "Módulo asignado correctamente al rol" });
+
+            return BadRequest(result.Errors.FirstOrDefault());
+        }
+
+        [HttpDelete("remove-module/{roleId}/{moduleId}")]
+        [Authorize]
+        public async Task<IActionResult> RemoveModuleFromRole(Guid roleId, Guid moduleId)
+        {
+            var result = await _roleService.RemoveModuleFromRoleAsync(roleId, moduleId);
+
+            if (result.Succeeded)
+                return Ok(new { Message = "Módulo eliminado correctamente del rol" });
+
+            return BadRequest(result.Errors.FirstOrDefault());
+        }
+
+        [HttpPost("assign-route")]
+        [Authorize]
+        public async Task<IActionResult> AssignRouteToRole([FromBody] AssignRouteToRoleDto assignRouteToRoleDto)
+        {
+            var result = await _roleService.AssignRouteToRoleAsync(assignRouteToRoleDto);
+
+            if (result.Succeeded)
+                return Ok(new { Message = "Ruta asignada correctamente al rol" });
+
+            return BadRequest(result.Errors.FirstOrDefault());
+        }
+
+        [HttpDelete("remove-route/{roleId}/{routeId}")]
+        [Authorize]
+        public async Task<IActionResult> RemoveRouteFromRole(Guid roleId, Guid routeId)
+        {
+            var result = await _roleService.RemoveRouteFromRoleAsync(roleId, routeId);
+
+            if (result.Succeeded)
+                return Ok(new { Message = "Ruta eliminada correctamente del rol" });
+
+            return BadRequest(result.Errors.FirstOrDefault());
+        }
     }
 }
