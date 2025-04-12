@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor de Auditoría</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 20px;
+        }
+        .audit-container {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+        }
+        .audit-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #6c757d;
+        }
+        .audit-item.create {
+            border-left-color: #28a745;
+        }
+        .audit-item.update {
+            border-left-color: #ffc107;
+        }
+        .audit-item.delete {
+            border-left-color: #dc3545;
+        }
+        .audit-item.security {
+            border-left-color: #17a2b8;
+        }
+        .audit-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        .audit-user {
+            font-weight: bold;
+        }
+        .audit-date {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+        .audit-action {
+            font-weight: bold;
+        }
+        .audit-table {
+            color: #6c757d;
+        }
+        .audit-details {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .filter-container {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .response-container {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        pre {
+            white-space: pre-wrap;
+        }
+        .pagination {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4 text-center">Visor de Auditoría</h1>
+        
+        <div id="loginSection">
+            <h2 class="mb-3">Iniciar Sesión</h2>
+            <form id="loginForm">
+                <div class="mb-3">
+                    <label for="username" class="form-label">Usuario</label>
+                    <select id="username" class="form-select">
+                        <option value="admin">admin (Administrador)</option>
+                        <option value="testadmin">testadmin (Administrador - Prueba)</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">Contraseña</label>
+                    <input type="password" class="form-control" id="password" value="Admin123!">
+                    <div class="form-text">Para el usuario testadmin, use la contraseña: test123</div>
+                </div>
+                <button type="submit" class="btn btn-primary">Iniciar Sesión</button>
+            </form>
+            <div id="loginResponse" class="response-container d-none">
+                <h4>Respuesta:</h4>
+                <pre id="loginResponseText"></pre>
+            </div>
+        </div>
+        
+        <div id="auditSection" class="d-none">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-3">Registros de Auditoría</h2>
+                <button id="logoutBtn" class="btn btn-outline-danger">Cerrar Sesión</button>
+            </div>
+            
+            <div id="userInfo" class="alert alert-info">
+                <h5>Información del Usuario</h5>
+                <p><strong>Usuario:</strong> <span id="userUsername"></span></p>
+                <p><strong>Rol:</strong> <span id="userRole"></span></p>
+            </div>
+            
+            <div class="filter-container">
+                <h4>Filtros</h4>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label for="filterUser" class="form-label">Usuario</label>
+                        <input type="text" class="form-control" id="filterUser">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="filterTable" class="form-label">Tabla</label>
+                        <select id="filterTable" class="form-select">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="filterAction" class="form-label">Acción</label>
+                        <select id="filterAction" class="form-select">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="filterDateRange" class="form-label">Rango de Fechas</label>
+                        <select id="filterDateRange" class="form-select">
+                            <option value="all">Todas</option>
+                            <option value="today">Hoy</option>
+                            <option value="yesterday">Ayer</option>
+                            <option value="week">Última Semana</option>
+                            <option value="month">Último Mes</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-end">
+                    <button id="applyFiltersBtn" class="btn btn-primary">Aplicar Filtros</button>
+                    <button id="resetFiltersBtn" class="btn btn-outline-secondary ms-2">Restablecer</button>
+                </div>
+            </div>
+            
+            <div id="auditResponse" class="response-container d-none">
+                <h4>Respuesta:</h4>
+                <pre id="auditResponseText"></pre>
+            </div>
+            
+            <div id="auditContainer" class="audit-container">
+                <div id="auditItems"></div>
+                <div id="pagination" class="d-flex justify-content-center">
+                    <nav aria-label="Paginación de auditoría">
+                        <ul class="pagination" id="paginationControls"></ul>
+                    </nav>
+                </div>
+                <div id="noRecords" class="alert alert-info d-none">
+                    No se encontraron registros de auditoría con los filtros aplicados.
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Configuración de la API
+        const apiUrl = 'http://localhost:5108';
+        let token = '';
+        let currentUser = null;
+        let currentPage = 1;
+        let pageSize = 10;
+        let totalPages = 1;
+        
+        // Elementos del DOM
+        const loginForm = document.getElementById('loginForm');
+        const loginResponse = document.getElementById('loginResponse');
+        const loginResponseText = document.getElementById('loginResponseText');
+        const auditSection = document.getElementById('auditSection');
+        const loginSection = document.getElementById('loginSection');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const userUsername = document.getElementById('userUsername');
+        const userRole = document.getElementById('userRole');
+        const filterUser = document.getElementById('filterUser');
+        const filterTable = document.getElementById('filterTable');
+        const filterAction = document.getElementById('filterAction');
+        const filterDateRange = document.getElementById('filterDateRange');
+        const applyFiltersBtn = document.getElementById('applyFiltersBtn');
+        const resetFiltersBtn = document.getElementById('resetFiltersBtn');
+        const auditResponse = document.getElementById('auditResponse');
+        const auditResponseText = document.getElementById('auditResponseText');
+        const auditItems = document.getElementById('auditItems');
+        const paginationControls = document.getElementById('paginationControls');
+        const noRecords = document.getElementById('noRecords');
+        
+        // Función para iniciar sesión
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await fetch(`${apiUrl}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                loginResponse.classList.remove('d-none');
+                loginResponseText.textContent = JSON.stringify(data, null, 2);
+                
+                if (response.ok && data.token) {
+                    token = data.token;
+                    currentUser = {
+                        username: username,
+                        role: username === 'admin' || username === 'testadmin' ? 'Administrador' : 'Usuario'
+                    };
+                    
+                    // Mostrar sección de auditoría
+                    loginSection.classList.add('d-none');
+                    auditSection.classList.remove('d-none');
+                    
+                    // Actualizar información del usuario
+                    userUsername.textContent = currentUser.username;
+                    userRole.textContent = currentUser.role;
+                    
+                    // Cargar datos iniciales
+                    loadTables();
+                    loadActions();
+                    loadAuditLogs();
+                }
+            } catch (error) {
+                loginResponseText.textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Función para cerrar sesión
+        logoutBtn.addEventListener('click', () => {
+            token = '';
+            currentUser = null;
+            
+            // Ocultar sección de auditoría y mostrar login
+            auditSection.classList.add('d-none');
+            loginSection.classList.remove('d-none');
+            
+            // Limpiar respuestas
+            loginResponse.classList.add('d-none');
+            auditResponse.classList.add('d-none');
+        });
+        
+        // Función para cargar tablas disponibles
+        async function loadTables() {
+            try {
+                const response = await fetch(`${apiUrl}/api/audit/tables`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const tables = await response.json();
+                    filterTable.innerHTML = '<option value="">Todas</option>';
+                    
+                    tables.forEach(table => {
+                        const option = document.createElement('option');
+                        option.value = table;
+                        option.textContent = table;
+                        filterTable.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error al cargar tablas:', error);
+            }
+        }
+        
+        // Función para cargar acciones disponibles
+        async function loadActions() {
+            try {
+                const response = await fetch(`${apiUrl}/api/audit/actions`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const actions = await response.json();
+                    filterAction.innerHTML = '<option value="">Todas</option>';
+                    
+                    actions.forEach(action => {
+                        const option = document.createElement('option');
+                        option.value = action;
+                        option.textContent = action;
+                        filterAction.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error al cargar acciones:', error);
+            }
+        }
+        
+        // Función para cargar registros de auditoría
+        async function loadAuditLogs() {
+            try {
+                let url = `${apiUrl}/api/audit?page=${currentPage}&pageSize=${pageSize}`;
+                
+                // Aplicar filtros
+                if (filterUser.value) {
+                    url += `&userId=${encodeURIComponent(filterUser.value)}`;
+                }
+                
+                if (filterTable.value) {
+                    url += `&tableName=${encodeURIComponent(filterTable.value)}`;
+                }
+                
+                // Aplicar filtro de fechas
+                const today = new Date();
+                let fromDate = null;
+                
+                switch (filterDateRange.value) {
+                    case 'today':
+                        fromDate = new Date(today.setHours(0, 0, 0, 0));
+                        break;
+                    case 'yesterday':
+                        fromDate = new Date(today);
+                        fromDate.setDate(fromDate.getDate() - 1);
+                        fromDate.setHours(0, 0, 0, 0);
+                        break;
+                    case 'week':
+                        fromDate = new Date(today);
+                        fromDate.setDate(fromDate.getDate() - 7);
+                        break;
+                    case 'month':
+                        fromDate = new Date(today);
+                        fromDate.setMonth(fromDate.getMonth() - 1);
+                        break;
+                }
+                
+                if (fromDate) {
+                    url += `&fromDate=${fromDate.toISOString()}`;
+                }
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    auditResponse.classList.remove('d-none');
+                    auditResponseText.textContent = JSON.stringify(data, null, 2);
+                    
+                    renderAuditLogs(data);
+                }
+            } catch (error) {
+                console.error('Error al cargar registros de auditoría:', error);
+                auditResponseText.textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        // Función para renderizar registros de auditoría
+        function renderAuditLogs(data) {
+            auditItems.innerHTML = '';
+            
+            if (data.data.length === 0) {
+                noRecords.classList.remove('d-none');
+            } else {
+                noRecords.classList.add('d-none');
+                
+                data.data.forEach(log => {
+                    const auditItem = document.createElement('div');
+                    auditItem.className = `audit-item ${getTypeClass(log.type)}`;
+                    
+                    const header = document.createElement('div');
+                    header.className = 'audit-header';
+                    
+                    const userInfo = document.createElement('div');
+                    userInfo.className = 'audit-user';
+                    userInfo.textContent = log.userName || log.userId || 'Sistema';
+                    
+                    const dateInfo = document.createElement('div');
+                    dateInfo.className = 'audit-date';
+                    dateInfo.textContent = new Date(log.dateTime).toLocaleString();
+                    
+                    header.appendChild(userInfo);
+                    header.appendChild(dateInfo);
+                    
+                    const action = document.createElement('div');
+                    action.innerHTML = `<span class="audit-action">${log.action}</span> <span class="audit-table">${log.tableName}</span>`;
+                    
+                    const details = document.createElement('div');
+                    details.className = 'audit-details';
+                    
+                    // Mostrar valores antiguos y nuevos si existen
+                    if (log.oldValues || log.newValues) {
+                        let detailsContent = '';
+                        
+                        if (log.oldValues) {
+                            try {
+                                const oldValues = JSON.parse(log.oldValues);
+                                detailsContent += `<strong>Valores Anteriores:</strong>\n${JSON.stringify(oldValues, null, 2)}\n\n`;
+                            } catch {
+                                detailsContent += `<strong>Valores Anteriores:</strong>\n${log.oldValues}\n\n`;
+                            }
+                        }
+                        
+                        if (log.newValues) {
+                            try {
+                                const newValues = JSON.parse(log.newValues);
+                                detailsContent += `<strong>Valores Nuevos:</strong>\n${JSON.stringify(newValues, null, 2)}`;
+                            } catch {
+                                detailsContent += `<strong>Valores Nuevos:</strong>\n${log.newValues}`;
+                            }
+                        }
+                        
+                        details.innerHTML = detailsContent;
+                    } else {
+                        details.textContent = 'No hay detalles disponibles';
+                    }
+                    
+                    auditItem.appendChild(header);
+                    auditItem.appendChild(action);
+                    auditItem.appendChild(details);
+                    
+                    auditItems.appendChild(auditItem);
+                });
+                
+                // Actualizar paginación
+                totalPages = data.totalPages;
+                renderPagination();
+            }
+        }
+        
+        // Función para renderizar controles de paginación
+        function renderPagination() {
+            paginationControls.innerHTML = '';
+            
+            // Botón Anterior
+            const prevItem = document.createElement('li');
+            prevItem.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+            const prevLink = document.createElement('a');
+            prevLink.className = 'page-link';
+            prevLink.href = '#';
+            prevLink.textContent = 'Anterior';
+            prevLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (currentPage > 1) {
+                    currentPage--;
+                    loadAuditLogs();
+                }
+            });
+            prevItem.appendChild(prevLink);
+            paginationControls.appendChild(prevItem);
+            
+            // Páginas
+            const maxPages = 5;
+            const startPage = Math.max(1, currentPage - Math.floor(maxPages / 2));
+            const endPage = Math.min(totalPages, startPage + maxPages - 1);
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const pageItem = document.createElement('li');
+                pageItem.className = `page-item ${i === currentPage ? 'active' : ''}`;
+                const pageLink = document.createElement('a');
+                pageLink.className = 'page-link';
+                pageLink.href = '#';
+                pageLink.textContent = i;
+                pageLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    currentPage = i;
+                    loadAuditLogs();
+                });
+                pageItem.appendChild(pageLink);
+                paginationControls.appendChild(pageItem);
+            }
+            
+            // Botón Siguiente
+            const nextItem = document.createElement('li');
+            nextItem.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+            const nextLink = document.createElement('a');
+            nextLink.className = 'page-link';
+            nextLink.href = '#';
+            nextLink.textContent = 'Siguiente';
+            nextLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    loadAuditLogs();
+                }
+            });
+            nextItem.appendChild(nextLink);
+            paginationControls.appendChild(nextItem);
+        }
+        
+        // Función para obtener clase CSS según el tipo de auditoría
+        function getTypeClass(type) {
+            switch (type) {
+                case 'Create':
+                    return 'create';
+                case 'Update':
+                    return 'update';
+                case 'Delete':
+                    return 'delete';
+                case 'Security':
+                    return 'security';
+                default:
+                    return '';
+            }
+        }
+        
+        // Eventos para filtros
+        applyFiltersBtn.addEventListener('click', () => {
+            currentPage = 1;
+            loadAuditLogs();
+        });
+        
+        resetFiltersBtn.addEventListener('click', () => {
+            filterUser.value = '';
+            filterTable.value = '';
+            filterAction.value = '';
+            filterDateRange.value = 'all';
+            currentPage = 1;
+            loadAuditLogs();
+        });
+    </script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

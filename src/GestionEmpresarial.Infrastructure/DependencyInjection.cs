@@ -34,9 +34,10 @@ namespace GestionEmpresarial.Infrastructure
             services.AddTransient<IEmailService, EmailService>();
             
             // Servicios para módulos, rutas y menús
-            services.AddTransient<IModuleService, ModuleService>();
-            services.AddTransient<IRouteService, RouteService>();
-            services.AddTransient<IMenuService, MenuService>();
+            services.AddScoped<IModuleService, ModuleService>();
+            services.AddScoped<IRouteService, RouteService>();
+            services.AddScoped<IMenuService, MenuService>();
+            services.AddScoped<IAuditService, AuditService>();
 
             // Configuración y registro del servicio LDAP
             services.Configure<LdapSettings>(configuration.GetSection("LdapSettings"));

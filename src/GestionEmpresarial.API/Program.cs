@@ -17,6 +17,7 @@ using GestionEmpresarial.Application.Permissions.Validators;
 using GestionEmpresarial.Application.Users.Validators;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json.Serialization;
+using GestionEmpresarial.API.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -149,6 +150,9 @@ app.UseHttpsRedirection();
 
 // Use CORS
 app.UseCors("AllowSpecificOrigin");
+
+// Registrar el middleware de auditoría
+app.UseAuditMiddleware();
 
 // Use authentication and authorization
 app.UseAuthentication();

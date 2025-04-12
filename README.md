@@ -16,6 +16,7 @@ El proyecto está organizado en capas siguiendo los principios de Arquitectura L
 - Autenticación JWT
 - Gestión de usuarios y roles
 - Sistema de menús basados en roles
+- Sistema de auditoría completo
 - Arquitectura Limpia
 - Patrón Mediator con MediatR
 - Entity Framework Core para acceso a datos
@@ -121,6 +122,7 @@ La API estará disponible en: http://localhost:5000
 
 - `GET /api/menus/my-menu`: Obtener el menú del usuario autenticado
 - `GET /api/menus/by-role/{roleId}`: Obtener el menú para un rol específico
+- `GET /api/menus/test-menu`: Obtener un menú de ejemplo (no requiere autenticación)
 - `GET /api/modules`: Obtener todos los módulos
 - `GET /api/modules/{id}`: Obtener un módulo por ID
 - `POST /api/modules`: Crear un nuevo módulo
@@ -131,6 +133,13 @@ La API estará disponible en: http://localhost:5000
 - `POST /api/routes`: Crear una nueva ruta
 - `PUT /api/routes/{id}`: Actualizar una ruta existente
 - `DELETE /api/routes/{id}`: Eliminar una ruta
+
+### Auditoría
+
+- `GET /api/audit`: Obtener registros de auditoría con filtros y paginación
+- `GET /api/audit/{id}`: Obtener un registro de auditoría por ID
+- `GET /api/audit/tables`: Obtener lista de tablas para filtrar auditorías
+- `GET /api/audit/actions`: Obtener lista de acciones para filtrar auditorías
 
 ## Pruebas
 
@@ -204,9 +213,60 @@ El sistema implementa un mecanismo de menús dinámicos basados en roles que per
 ]
 ```
 
+## Sistema de Auditoría
+
+El sistema implementa un mecanismo completo de auditoría que registra automáticamente todas las acciones importantes realizadas en la aplicación:
+
+1. **Registro automático**: Captura automáticamente las operaciones CRUD en entidades importantes.
+2. **Información detallada**: Almacena información sobre el usuario, acción, tabla, valores antiguos y nuevos, IP, agente de usuario, etc.
+3. **Middleware personalizado**: Utiliza un middleware para capturar información adicional de las solicitudes HTTP.
+4. **Filtrado avanzado**: Permite filtrar registros por usuario, tabla, acción y rango de fechas.
+5. **Visualización amigable**: Incluye una página HTML para visualizar y explorar los registros de auditoría.
+
+### Estructura de Datos
+
+La entidad `AuditLog` almacena los siguientes datos:
+
+- **Id**: Identificador único del registro de auditoría
+- **UserId**: ID del usuario que realizó la acción
+- **UserName**: Nombre del usuario que realizó la acción
+- **Type**: Tipo de operación (Create, Update, Delete, Security)
+- **TableName**: Nombre de la tabla o entidad afectada
+- **DateTime**: Fecha y hora de la acción
+- **OldValues**: Valores anteriores (para actualizaciones)
+- **NewValues**: Valores nuevos
+- **AffectedColumns**: Columnas afectadas
+- **PrimaryKey**: Clave primaria del registro afectado
+- **Action**: Acción específica realizada
+- **IpAddress**: Dirección IP desde donde se realizó la acción
+- **UserAgent**: Agente de usuario del navegador
+
+### Ejemplo de Uso
+
+Para ver los registros de auditoría:
+
+1. Inicie sesión como administrador
+2. Acceda a la API mediante: `GET /api/audit`
+3. Aplique filtros según sea necesario: `GET /api/audit?userId=admin&tableName=Users&fromDate=2023-01-01`
+
+También puede utilizar la página de prueba HTML incluida en el proyecto:
+
+1. Abra el archivo `tests/AuditTest.html` en su navegador
+2. Inicie sesión con un usuario administrador
+3. Explore y filtre los registros de auditoría
+
+### Migración Manual de Base de Datos
+
+Para crear la tabla de auditoría, ejecute el siguiente script SQL:
+
+```bash
+# Desde la carpeta raíz del proyecto
+sqlcmd -S localhost -d GestionEmpresarialNuevoDB -i "src\GestionEmpresarial.Infrastructure\Persistence\Migrations\Manual\CreateAuditLogsTable.sql" -E
+```
+
 ## Migración Manual de Base de Datos
 
-Para aplicar las migraciones manuales y configurar los módulos, rutas y usuarios de prueba:
+Para aplicar las migraciones manuales y configurar los módulos, rutas, usuarios de prueba y auditoría:
 
 1. Ejecute los siguientes scripts SQL en orden:
 
@@ -215,6 +275,7 @@ Para aplicar las migraciones manuales y configurar los módulos, rutas y usuario
 sqlcmd -S localhost -d GestionEmpresarialNuevoDB -i "src\GestionEmpresarial.Infrastructure\Persistence\Migrations\Manual\FixedModulesAndRoutes.sql" -E
 sqlcmd -S localhost -d GestionEmpresarialNuevoDB -i "src\GestionEmpresarial.Infrastructure\Persistence\Migrations\Manual\AddRoleAssignments.sql" -E
 sqlcmd -S localhost -d GestionEmpresarialNuevoDB -i "src\GestionEmpresarial.Infrastructure\Persistence\Migrations\Manual\AddTestUsers.sql" -E
+sqlcmd -S localhost -d GestionEmpresarialNuevoDB -i "src\GestionEmpresarial.Infrastructure\Persistence\Migrations\Manual\CreateAuditLogsTable.sql" -E
 ```
 
 ## Contribución

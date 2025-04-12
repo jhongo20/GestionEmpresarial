@@ -19,6 +19,7 @@ namespace GestionEmpresarial.Application.Common.Interfaces
         DbSet<Route> Routes { get; }
         DbSet<RoleModule> RoleModules { get; }
         DbSet<RoleRoute> RoleRoutes { get; }
+        DbSet<AuditLog> AuditLogs { get; }
 
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
     }
