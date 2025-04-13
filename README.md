@@ -86,6 +86,7 @@ dotnet ef database update
 - [Estructura de Base de Datos](docs/DatabaseStructure.md): Documentación técnica completa de la estructura de la base de datos, incluyendo tablas, campos, relaciones y consideraciones de diseño.
 - [Integración con Sistemas Externos](docs/APIIntegration.md): Guía completa para la integración de sistemas externos con la API, incluyendo autenticación, endpoints y mejores prácticas.
 - [Recomendaciones](docs/Recomendaciones.md): Recomendaciones para mejorar la seguridad, rendimiento, escalabilidad y flexibilidad del sistema.
+- [Caché LDAP](docs/LdapCaching.md): Documentación sobre la implementación del sistema de caché para consultas LDAP frecuentes.
 
 ## Ejecución
 

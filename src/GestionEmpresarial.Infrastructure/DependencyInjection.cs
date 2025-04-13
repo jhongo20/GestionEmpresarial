@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace GestionEmpresarial.Infrastructure
 {
@@ -39,6 +40,14 @@ namespace GestionEmpresarial.Infrastructure
             services.AddScoped<IMenuService, MenuService>();
             services.AddScoped<IAuditService, AuditService>();
             services.AddScoped<IEmailTemplateService, EmailTemplateService>();
+
+            // Configuración del servicio de caché en memoria
+            services.AddMemoryCache(options =>
+            {
+                // Configurar opciones de caché
+                options.SizeLimit = 1024; // Tamaño máximo en MB (ajustar según necesidades)
+                options.ExpirationScanFrequency = TimeSpan.FromMinutes(5); // Frecuencia de escaneo para eliminar entradas expiradas
+            });
 
             // Configuración y registro del servicio LDAP
             services.Configure<LdapSettings>(configuration.GetSection("LdapSettings"));

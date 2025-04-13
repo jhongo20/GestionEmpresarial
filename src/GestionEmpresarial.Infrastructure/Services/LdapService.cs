@@ -2,6 +2,7 @@ using GestionEmpresarial.Application.Common.Interfaces;
 using GestionEmpresarial.Application.Common.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Caching.Memory;
 using System;
 using System.DirectoryServices.Protocols;
 using System.Net;
@@ -13,27 +14,57 @@ namespace GestionEmpresarial.Infrastructure.Services
     {
         private readonly LdapSettings _ldapSettings;
         private readonly ILogger<LdapService> _logger;
+        private readonly IMemoryCache _cache;
+        
+        // Claves de caché para diferentes operaciones LDAP
+        private const string CACHE_KEY_USER_EXISTS = "LDAP_USER_EXISTS_{0}";
+        private const string CACHE_KEY_USER_EMAIL = "LDAP_USER_EMAIL_{0}";
+        private const string CACHE_KEY_USER_DISPLAY_NAME = "LDAP_USER_DISPLAY_NAME_{0}";
+        
+        // Tiempos de expiración de caché para diferentes tipos de datos
+        private static readonly TimeSpan USER_EXISTS_CACHE_DURATION = TimeSpan.FromMinutes(30);
+        private static readonly TimeSpan USER_ATTRIBUTES_CACHE_DURATION = TimeSpan.FromHours(2);
 
-        public LdapService(IOptions<LdapSettings> ldapSettings, ILogger<LdapService> logger)
+        public LdapService(
+            IOptions<LdapSettings> ldapSettings,
+            ILogger<LdapService> logger,
+            IMemoryCache memoryCache)
         {
             _ldapSettings = ldapSettings.Value;
             _logger = logger;
+            _cache = memoryCache;
         }
 
         public async Task<bool> AuthenticateAsync(string username, string password)
         {
             if (!_ldapSettings.Enabled)
             {
-                _logger.LogWarning("LDAP authentication is disabled");
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+            {
                 return false;
             }
 
             try
             {
-                // Crear la conexión LDAP
+                // Para la autenticación no usamos caché por seguridad
+                // Cada intento de autenticación debe verificarse contra el directorio LDAP
+
                 var ldapIdentifier = new LdapDirectoryIdentifier(_ldapSettings.Server, _ldapSettings.Port);
-                
-                // Primero autenticamos con la cuenta de servicio para buscar al usuario
+                using var connection = new LdapConnection(ldapIdentifier)
+                {
+                    AuthType = AuthType.Basic
+                };
+
+                if (_ldapSettings.UseSSL)
+                {
+                    connection.SessionOptions.SecureSocketLayer = true;
+                    connection.SessionOptions.VerifyServerCertificate = (conn, cert) => true;
+                }
+
+                // Primero, buscar al usuario para obtener su DN completo
                 using var serviceConnection = new LdapConnection(ldapIdentifier)
                 {
                     AuthType = AuthType.Basic,
@@ -43,13 +74,11 @@ namespace GestionEmpresarial.Infrastructure.Services
                 if (_ldapSettings.UseSSL)
                 {
                     serviceConnection.SessionOptions.SecureSocketLayer = true;
-                    serviceConnection.SessionOptions.VerifyServerCertificate = (conn, cert) => true; // En producción, esto debería validar correctamente
+                    serviceConnection.SessionOptions.VerifyServerCertificate = (conn, cert) => true;
                 }
 
-                // Conectar con la cuenta de servicio
                 await Task.Run(() => serviceConnection.Bind());
 
-                // Buscar al usuario
                 var searchRequest = new SearchRequest(
                     _ldapSettings.SearchBase,
                     string.Format(_ldapSettings.SearchFilter, username),
@@ -61,33 +90,29 @@ namespace GestionEmpresarial.Infrastructure.Services
 
                 if (searchResponse.Entries.Count == 0)
                 {
-                    _logger.LogWarning("User {Username} not found in LDAP", username);
+                    _logger.LogWarning("User {Username} not found in LDAP directory", username);
                     return false;
                 }
 
-                // Obtener el DN del usuario
                 var userDn = searchResponse.Entries[0].DistinguishedName;
 
-                // Intentar autenticar con las credenciales del usuario
+                // Ahora intentar autenticar con las credenciales del usuario
                 try
                 {
-                    using var userConnection = new LdapConnection(ldapIdentifier)
-                    {
-                        AuthType = AuthType.Basic,
-                        Credential = new NetworkCredential(userDn, password)
-                    };
-
-                    if (_ldapSettings.UseSSL)
-                    {
-                        userConnection.SessionOptions.SecureSocketLayer = true;
-                        userConnection.SessionOptions.VerifyServerCertificate = (conn, cert) => true;
-                    }
-
-                    await Task.Run(() => userConnection.Bind());
+                    connection.Credential = new NetworkCredential(userDn, password);
+                    await Task.Run(() => connection.Bind());
+                    
                     _logger.LogInformation("User {Username} authenticated successfully via LDAP", username);
+                    
+                    // Actualizar la caché de existencia de usuario después de una autenticación exitosa
+                    var cacheKey = string.Format(CACHE_KEY_USER_EXISTS, username);
+                    var cacheEntryOptions = new MemoryCacheEntryOptions()
+                        .SetSlidingExpiration(USER_EXISTS_CACHE_DURATION);
+                    _cache.Set(cacheKey, true, cacheEntryOptions);
+                    
                     return true;
                 }
-                catch (LdapException ex)
+                catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Failed to authenticate user {Username} via LDAP", username);
                     return false;
@@ -105,6 +130,13 @@ namespace GestionEmpresarial.Infrastructure.Services
             if (!_ldapSettings.Enabled)
             {
                 return string.Empty;
+            }
+
+            // Verificar si el correo electrónico del usuario ya está en caché
+            var cacheKey = string.Format(CACHE_KEY_USER_EMAIL, username);
+            if (_cache.TryGetValue(cacheKey, out string userEmail))
+            {
+                return userEmail;
             }
 
             try
@@ -141,7 +173,14 @@ namespace GestionEmpresarial.Infrastructure.Services
                 var entry = searchResponse.Entries[0];
                 if (entry.Attributes.Contains(_ldapSettings.EmailAttribute))
                 {
-                    return entry.Attributes[_ldapSettings.EmailAttribute][0] as string ?? string.Empty;
+                    userEmail = entry.Attributes[_ldapSettings.EmailAttribute][0] as string ?? string.Empty;
+
+                    // Almacenar el correo electrónico del usuario en caché
+                    var cacheEntryOptions = new MemoryCacheEntryOptions()
+                        .SetSlidingExpiration(USER_ATTRIBUTES_CACHE_DURATION);
+                    _cache.Set(cacheKey, userEmail, cacheEntryOptions);
+
+                    return userEmail;
                 }
 
                 return string.Empty;
@@ -158,6 +197,13 @@ namespace GestionEmpresarial.Infrastructure.Services
             if (!_ldapSettings.Enabled)
             {
                 return string.Empty;
+            }
+
+            // Verificar si el nombre de visualización del usuario ya está en caché
+            var cacheKey = string.Format(CACHE_KEY_USER_DISPLAY_NAME, username);
+            if (_cache.TryGetValue(cacheKey, out string userDisplayName))
+            {
+                return userDisplayName;
             }
 
             try
@@ -194,7 +240,14 @@ namespace GestionEmpresarial.Infrastructure.Services
                 var entry = searchResponse.Entries[0];
                 if (entry.Attributes.Contains(_ldapSettings.DisplayNameAttribute))
                 {
-                    return entry.Attributes[_ldapSettings.DisplayNameAttribute][0] as string ?? string.Empty;
+                    userDisplayName = entry.Attributes[_ldapSettings.DisplayNameAttribute][0] as string ?? string.Empty;
+
+                    // Almacenar el nombre de visualización del usuario en caché
+                    var cacheEntryOptions = new MemoryCacheEntryOptions()
+                        .SetSlidingExpiration(USER_ATTRIBUTES_CACHE_DURATION);
+                    _cache.Set(cacheKey, userDisplayName, cacheEntryOptions);
+
+                    return userDisplayName;
                 }
 
                 return string.Empty;
@@ -222,6 +275,13 @@ namespace GestionEmpresarial.Infrastructure.Services
             {
                 _logger.LogWarning("LDAP is disabled, cannot check if user exists");
                 return false;
+            }
+
+            // Verificar si la existencia del usuario ya está en caché
+            var cacheKey = string.Format(CACHE_KEY_USER_EXISTS, username);
+            if (_cache.TryGetValue(cacheKey, out bool userExists))
+            {
+                return userExists;
             }
 
             try
@@ -255,7 +315,7 @@ namespace GestionEmpresarial.Infrastructure.Services
 
                 var searchResponse = (SearchResponse)await Task.Run(() => serviceConnection.SendRequest(searchRequest));
 
-                bool userExists = searchResponse.Entries.Count > 0;
+                userExists = searchResponse.Entries.Count > 0;
                 
                 if (userExists)
                 {
@@ -265,7 +325,12 @@ namespace GestionEmpresarial.Infrastructure.Services
                 {
                     _logger.LogWarning("User {Username} not found in LDAP directory", username);
                 }
-                
+
+                // Almacenar la existencia del usuario en caché
+                var cacheEntryOptions = new MemoryCacheEntryOptions()
+                    .SetSlidingExpiration(USER_EXISTS_CACHE_DURATION);
+                _cache.Set(cacheKey, userExists, cacheEntryOptions);
+
                 return userExists;
             }
             catch (Exception ex)
