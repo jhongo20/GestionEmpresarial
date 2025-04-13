@@ -40,10 +40,31 @@ namespace GestionEmpresarial.Infrastructure.Identity
         {
             _logger.LogInformation($"Intentando autenticar al usuario: {username}");
             
+            // Verificar si el usuario es interno (sin dominio @mintrabajo.gov.co)
+            if (!username.Contains("@"))
+            {
+                // Si el usuario no contiene @, asumimos que es un usuario interno
+                // y agregamos el dominio @mintrabajo.gov.co
+                string emailWithDomain = $"{username}@mintrabajo.gov.co";
+                _logger.LogInformation($"Usuario sin dominio detectado. Buscando con: {emailWithDomain}");
+                
+                // Intentar encontrar el usuario por email
+                var userByEmail = await _context.Users
+                    .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
+                    .FirstOrDefaultAsync(u => u.Email == emailWithDomain && !u.IsDeleted);
+                
+                if (userByEmail != null)
+                {
+                    _logger.LogInformation($"Usuario encontrado por email: {emailWithDomain}");
+                    username = userByEmail.Username;
+                }
+            }
+
             var user = await _context.Users
                 .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
-                .FirstOrDefaultAsync(u => u.Username == username && !u.IsDeleted);
+                .FirstOrDefaultAsync(u => (u.Username == username || u.Email == username) && !u.IsDeleted);
 
             if (user == null)
             {
@@ -60,8 +81,17 @@ namespace GestionEmpresarial.Infrastructure.Identity
             if (user.IsLdapUser)
             {
                 // Si es un usuario LDAP, verificamos las credenciales contra el directorio activo
-                isAuthenticated = await _ldapService.AuthenticateAsync(username, password);
-                _logger.LogInformation($"Autenticación LDAP: {isAuthenticated}");
+                // Para usuarios internos, podemos usar el nombre de usuario sin dominio o con dominio
+                string ldapUsername = user.Username;
+                if (!ldapUsername.Contains("@") && user.Email.EndsWith("@mintrabajo.gov.co"))
+                {
+                    // Si el nombre de usuario no tiene @ pero el email termina con @mintrabajo.gov.co
+                    // usamos el nombre de usuario para la autenticación LDAP
+                    ldapUsername = user.Email.Split('@')[0];
+                }
+                
+                isAuthenticated = await _ldapService.AuthenticateAsync(ldapUsername, password);
+                _logger.LogInformation($"Autenticación LDAP con usuario: {ldapUsername}, resultado: {isAuthenticated}");
             }
             else
             {

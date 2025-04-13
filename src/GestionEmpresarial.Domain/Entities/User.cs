@@ -35,6 +35,7 @@ namespace GestionEmpresarial.Domain.Entities
         public string? ActivationToken { get; set; }
         public DateTime? ActivationTokenExpires { get; set; }
         public bool IsLdapUser { get; set; }
+        public bool IsInternalUser { get; set; } // Indica si es un usuario interno (dominio @mintrabajo.gov.co)
 
         // Relaciones
         public virtual ICollection<UserRole> UserRoles { get; set; }

@@ -37,5 +37,12 @@ namespace GestionEmpresarial.Application.Common.Interfaces
         /// </summary>
         /// <returns>Nombre del rol por defecto</returns>
         string GetDefaultRoleName();
+
+        /// <summary>
+        /// Verifica si un usuario existe en el directorio LDAP
+        /// </summary>
+        /// <param name="username">Nombre de usuario</param>
+        /// <returns>True si el usuario existe, False en caso contrario</returns>
+        Task<bool> UserExistsAsync(string username);
     }
 }

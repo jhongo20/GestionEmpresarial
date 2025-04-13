@@ -27,6 +27,8 @@ El proyecto está organizado en capas siguiendo los principios de Arquitectura L
 - Envío de correos electrónicos para notificaciones de usuarios
 - Activación de cuentas mediante tokens y códigos numéricos para verificación de correo electrónico
 - Soporte para usuarios LDAP/Active Directory
+- Inicio de sesión simplificado para usuarios internos (dominio @mintrabajo.gov.co)
+- Verificación de existencia en directorio activo para usuarios internos
 
 ## Requisitos Previos
 
@@ -76,6 +78,11 @@ El proyecto está organizado en capas siguiendo los principios de Arquitectura L
 ```bash
 dotnet ef database update
 ```
+
+## Documentación
+
+- [Activación de Cuentas](docs/AccountActivation.md): Detalles sobre el proceso de activación de cuentas mediante tokens y códigos.
+- [Usuarios Internos](docs/InternalUsers.md): Información sobre las funcionalidades especiales para usuarios con dominio @mintrabajo.gov.co.
 
 ## Ejecución
 

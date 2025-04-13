@@ -21,19 +21,22 @@ namespace GestionEmpresarial.Infrastructure.Services
         private readonly IDateTime _dateTime;
         private readonly ILogger<UserService> _logger;
         private readonly IEmailService _emailService;
+        private readonly ILdapService _ldapService;
 
         public UserService(
             IApplicationDbContext context,
             ICurrentUserService currentUserService,
             IDateTime dateTime,
             ILogger<UserService> logger,
-            IEmailService emailService)
+            IEmailService emailService,
+            ILdapService ldapService)
         {
             _context = context;
             _currentUserService = currentUserService;
             _dateTime = dateTime;
             _logger = logger;
             _emailService = emailService;
+            _ldapService = ldapService;
         }
 
         public async Task<Result<List<UserDto>>> GetAllUsersAsync()
@@ -219,6 +222,45 @@ namespace GestionEmpresarial.Infrastructure.Services
         {
             try
             {
+                // Verificar si el usuario es interno (dominio @mintrabajo.gov.co)
+                bool isInternalUser = false;
+                string usernameForLdap = createUserDto.Username;
+                
+                // Si el email está vacío pero el username está presente, usar el username como email para usuarios internos
+                if (string.IsNullOrEmpty(createUserDto.Email) && !string.IsNullOrEmpty(createUserDto.Username))
+                {
+                    createUserDto.Email = $"{createUserDto.Username}@mintrabajo.gov.co";
+                    isInternalUser = true;
+                    _logger.LogInformation($"Usuario interno detectado con email vacío. Email generado: {createUserDto.Email}");
+                }
+                // Si el email no contiene @ pero es un usuario interno, agregar el dominio
+                else if (!string.IsNullOrEmpty(createUserDto.Email) && !createUserDto.Email.Contains("@"))
+                {
+                    usernameForLdap = createUserDto.Email; // Guardar el nombre de usuario original
+                    createUserDto.Email = $"{createUserDto.Email}@mintrabajo.gov.co";
+                    isInternalUser = true;
+                    _logger.LogInformation($"Usuario interno detectado. Email ajustado a: {createUserDto.Email}");
+                }
+                else if (!string.IsNullOrEmpty(createUserDto.Email) && createUserDto.Email.EndsWith("@mintrabajo.gov.co"))
+                {
+                    isInternalUser = true;
+                    usernameForLdap = createUserDto.Email.Split('@')[0]; // Extraer el nombre de usuario sin dominio
+                    _logger.LogInformation($"Usuario interno detectado con email completo: {createUserDto.Email}");
+                }
+
+                // Si es un usuario interno, verificar que exista en el directorio activo
+                if (isInternalUser)
+                {
+                    bool userExistsInLdap = await _ldapService.UserExistsAsync(usernameForLdap);
+                    
+                    if (!userExistsInLdap)
+                    {
+                        return Result<UserDto>.Failure($"El usuario {usernameForLdap} no existe en el directorio activo. No se puede crear un usuario interno que no exista en el directorio activo.");
+                    }
+                    
+                    _logger.LogInformation($"Usuario {usernameForLdap} verificado en el directorio activo.");
+                }
+
                 // Verificar si el nombre de usuario ya existe
                 if (await _context.Users.AnyAsync(u => u.Username == createUserDto.Username && !u.IsDeleted))
                 {
@@ -261,6 +303,7 @@ namespace GestionEmpresarial.Infrastructure.Services
                     IsDeleted = false,
                     IsActive = false, // El usuario debe estar inactivo hasta que active su cuenta
                     EmailConfirmed = false, // El correo no está confirmado hasta que active su cuenta
+                    IsInternalUser = isInternalUser, // Marcar si es usuario interno
                     CreatedBy = _currentUserService.UserId ?? "System",
                     CreatedAt = _dateTime.Now,
                     UpdatedBy = _currentUserService.UserId ?? "System",
@@ -570,8 +613,8 @@ namespace GestionEmpresarial.Infrastructure.Services
                     return Result<string>.Failure("La cuenta ya está activada.");
                 }
 
-                var token = await GenerateActivationTokenInternalAsync(userId);
-                return Result<string>.Success(token);
+                var activationToken = await GenerateActivationTokenInternalAsync(userId);
+                return Result<string>.Success(activationToken);
             }
             catch (Exception ex)
             {

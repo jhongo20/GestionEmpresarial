@@ -215,5 +215,64 @@ namespace GestionEmpresarial.Infrastructure.Services
         {
             return _ldapSettings.DefaultRole;
         }
+
+        public async Task<bool> UserExistsAsync(string username)
+        {
+            if (!_ldapSettings.Enabled)
+            {
+                _logger.LogWarning("LDAP is disabled, cannot check if user exists");
+                return false;
+            }
+
+            try
+            {
+                // Crear la conexión LDAP
+                var ldapIdentifier = new LdapDirectoryIdentifier(_ldapSettings.Server, _ldapSettings.Port);
+                
+                // Autenticamos con la cuenta de servicio para buscar al usuario
+                using var serviceConnection = new LdapConnection(ldapIdentifier)
+                {
+                    AuthType = AuthType.Basic,
+                    Credential = new NetworkCredential(_ldapSettings.BindDN, _ldapSettings.BindPassword)
+                };
+
+                if (_ldapSettings.UseSSL)
+                {
+                    serviceConnection.SessionOptions.SecureSocketLayer = true;
+                    serviceConnection.SessionOptions.VerifyServerCertificate = (conn, cert) => true; // En producción, esto debería validar correctamente
+                }
+
+                // Conectar con la cuenta de servicio
+                await Task.Run(() => serviceConnection.Bind());
+
+                // Buscar al usuario
+                var searchRequest = new SearchRequest(
+                    _ldapSettings.SearchBase,
+                    string.Format(_ldapSettings.SearchFilter, username),
+                    SearchScope.Subtree,
+                    null
+                );
+
+                var searchResponse = (SearchResponse)await Task.Run(() => serviceConnection.SendRequest(searchRequest));
+
+                bool userExists = searchResponse.Entries.Count > 0;
+                
+                if (userExists)
+                {
+                    _logger.LogInformation("User {Username} found in LDAP directory", username);
+                }
+                else
+                {
+                    _logger.LogWarning("User {Username} not found in LDAP directory", username);
+                }
+                
+                return userExists;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking if user {Username} exists in LDAP", username);
+                return false;
+            }
+        }
     }
 }

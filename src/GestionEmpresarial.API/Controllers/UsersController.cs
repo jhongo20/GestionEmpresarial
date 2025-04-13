@@ -60,6 +60,15 @@ namespace GestionEmpresarial.API.Controllers
         [Authorize]
         public async Task<IActionResult> CreateUser([FromBody] CreateUserDto createUserDto)
         {
+            // Para usuarios internos, permitir registrar solo con el nombre de usuario
+            if (!string.IsNullOrEmpty(createUserDto.Email) && !createUserDto.Email.Contains("@"))
+            {
+                // Si el email no contiene @, asumimos que es un usuario interno
+                // y se completará automáticamente en el servicio
+                var isInternalUser = true;
+                // No es necesario modificar el email aquí, se hará en el servicio
+            }
+
             var result = await _userService.CreateUserAsync(createUserDto);
 
             if (result.Succeeded)
