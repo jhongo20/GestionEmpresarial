@@ -85,6 +85,7 @@ dotnet ef database update
 - [Usuarios Internos](docs/InternalUsers.md): Información sobre las funcionalidades especiales para usuarios con dominio @mintrabajo.gov.co.
 - [Estructura de Base de Datos](docs/DatabaseStructure.md): Documentación técnica completa de la estructura de la base de datos, incluyendo tablas, campos, relaciones y consideraciones de diseño.
 - [Integración con Sistemas Externos](docs/APIIntegration.md): Guía completa para la integración de sistemas externos con la API, incluyendo autenticación, endpoints y mejores prácticas.
+- [Recomendaciones](docs/Recomendaciones.md): Recomendaciones para mejorar la seguridad, rendimiento, escalabilidad y flexibilidad del sistema.
 
 ## Ejecución
 
