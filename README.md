@@ -83,6 +83,7 @@ dotnet ef database update
 
 - [Activación de Cuentas](docs/AccountActivation.md): Detalles sobre el proceso de activación de cuentas mediante tokens y códigos.
 - [Usuarios Internos](docs/InternalUsers.md): Información sobre las funcionalidades especiales para usuarios con dominio @mintrabajo.gov.co.
+- [Estructura de Base de Datos](docs/DatabaseStructure.md): Documentación técnica completa de la estructura de la base de datos, incluyendo tablas, campos, relaciones y consideraciones de diseño.
 
 ## Ejecución
 
